@@ -1,0 +1,65 @@
+import { Timestamp } from 'firebase/firestore'
+import type { Score } from './group'
+
+export type RoundType =
+  | 'STROKE_GROSS'
+  | 'STROKE_NET'
+  | 'BEST_BALL_GROSS'
+  | 'BEST_BALL_NET'
+
+export type RoundStatus = 'pending' | 'active' | 'completed'
+
+export interface Team {
+  teamA: [string, string]
+  teamB: [string, string]
+}
+
+export interface HoleScore {
+  hole: number
+  grossScore: number
+  netScore: number
+}
+
+/** @deprecated Use Score from types/group.ts. Kept for component compatibility. */
+export type Scorecard = Score
+
+export interface Round {
+  roundId: string
+  name: string
+  courseId: string
+  courseName: string
+  teeId: string
+  teeName: string
+  date: Timestamp
+  roundType: RoundType
+  isPrivate: boolean
+  createdBy: string
+  status: RoundStatus
+  eventId: string | null
+  groupIds: string[]
+  memberIds: string[]
+  simpleGrossScore?: number
+  /** @deprecated moved to Group */
+  golferIds?: string[]
+  /** @deprecated moved to Group */
+  teams?: Team | null
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export interface RoundFormData {
+  name: string
+  courseId: string
+  teeId: string
+  date: string
+  roundType: RoundType
+  isPrivate: boolean
+  eventId?: string
+}
+
+/** @deprecated Use ActiveGroupContext from types/group.ts */
+export interface ActiveRoundContext {
+  round: Round
+  scorecards: Scorecard[]
+  tee: import('./course').Tee
+}

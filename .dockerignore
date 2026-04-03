@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.local
+.git
+docs
+*.md
+.github
+firestore.rules
+firestore.indexes.json
+firebase.json
+.firebaserc

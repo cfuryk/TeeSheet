@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(npm create:*)",
+      "Bash(npx create-vite@latest . --template react-ts)",
+      "Bash(2>&1)",
+      "Bash(printf 'y\\\\n')",
+      "Bash(npm install:*)",
+      "Bash(VITE_FIREBASE_API_KEY=placeholder VITE_FIREBASE_AUTH_DOMAIN=placeholder.firebaseapp.com VITE_FIREBASE_PROJECT_ID=placeholder VITE_FIREBASE_STORAGE_BUCKET=placeholder.appspot.com VITE_FIREBASE_MESSAGING_SENDER_ID=000000 VITE_FIREBASE_APP_ID=1:0:web:abc npx tsc --noEmit)",
+      "Bash(VITE_FIREBASE_API_KEY=placeholder VITE_FIREBASE_AUTH_DOMAIN=placeholder.firebaseapp.com VITE_FIREBASE_PROJECT_ID=placeholder VITE_FIREBASE_STORAGE_BUCKET=placeholder.appspot.com VITE_FIREBASE_MESSAGING_SENDER_ID=000000 VITE_FIREBASE_APP_ID=1:0:web:abc npm run build)",
+      "Bash(npm run:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
