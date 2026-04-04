@@ -13,6 +13,7 @@ const variantMap: Record<RoundType, 'green' | 'blue' | 'gray'> = {
   TWO_TEAM_BB_MATCH_NET: 'green',
   TWO_TEAM_BB_STROKE_GROSS: 'blue',
   TWO_TEAM_BB_STROKE_NET: 'green',
+  SCRAMBLE_GROSS: 'blue',
 }
 
 export function RoundTypeLabel({ roundType }: { roundType: RoundType }) {

@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase/firestore'
 import type { Score } from './group'
 
-export type ScoringFormat = 'individual' | 'two_team'
+export type ScoringFormat = 'individual' | 'two_team' | 'scramble'
 
 export type RoundType =
   // Individual
@@ -16,6 +16,8 @@ export type RoundType =
   | 'TWO_TEAM_BB_MATCH_NET'
   | 'TWO_TEAM_BB_STROKE_GROSS'
   | 'TWO_TEAM_BB_STROKE_NET'
+  // Scramble
+  | 'SCRAMBLE_GROSS'
 
 export type RoundStatus = 'pending' | 'active' | 'completed'
 

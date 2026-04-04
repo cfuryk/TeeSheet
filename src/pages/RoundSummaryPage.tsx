@@ -55,6 +55,8 @@ export function RoundSummaryPage() {
 
       {scoringFormat === 'two_team'
         ? <TwoTeamLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
+        : scoringFormat === 'scramble'
+        ? <ScrambleLeaderboard groups={groups} allScores={allScores} tee={tee} roundId={roundId!} navigate={navigate} />
         : <IndividualLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
       }
 
@@ -156,6 +158,51 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
             </button>
           )
         })}
+      </div>
+    </Card>
+  )
+}
+
+// ─── Scramble leaderboard ─────────────────────────────────────────────────
+
+function ScrambleLeaderboard({ groups, allScores, tee, roundId, navigate }: {
+  groups: Group[]
+  allScores: Score[]
+  tee: Tee
+  roundId: string
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const totalPar = tee.holes.reduce((s, h) => s + h.par, 0)
+
+  const rows = groups.map((group) => {
+    const adminId = group.groupAdminId ?? group.golferIds[0]
+    const score = allScores.find((s) => s.golferId === adminId)
+    const total = score?.totalGross ?? null
+    const vsPar = total !== null ? total - totalPar : null
+    return { group, adminId, total, vsPar }
+  }).sort((a, b) => (a.total ?? 999) - (b.total ?? 999))
+
+  return (
+    <Card className="p-4">
+      <h3 className="font-semibold text-gray-400 mb-3">Scramble Leaderboard</h3>
+      <div className="flex flex-col gap-2">
+        {rows.map((row, i) => (
+          <button
+            key={row.group.groupId}
+            type="button"
+            onClick={() => navigate(`/rounds/${roundId}/scorecard/${row.adminId}`)}
+            className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
+              <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{row.group.name ?? `Group ${i + 1}`}</span>
+            </span>
+            <span className="flex items-center shrink-0 ml-3">
+              <span className="font-mono w-8 text-right text-white">{row.total ?? '-'}</span>
+              <span className="font-mono w-14 text-right text-sm text-gray-400">{row.vsPar !== null ? `(${formatVsPar(row.vsPar)})` : ''}</span>
+            </span>
+          </button>
+        ))}
       </div>
     </Card>
   )

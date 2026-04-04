@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useGroup } from '@/hooks/useGroup'
+import { useGroup, useGroups } from '@/hooks/useGroup'
 import { useScores } from '@/hooks/useScore'
 import { useRound } from '@/hooks/useRound'
 import { userService } from '@/services/userService'
@@ -16,6 +16,7 @@ export function GroupPage() {
   const { currentUser } = useAuth()
   const { round, loading: roundLoading } = useRound(roundId!)
   const { group, loading: groupLoading } = useGroup(roundId!, groupId!)
+  const { groups: allGroups } = useGroups(roundId!)
   const { scores, loading: scoresLoading } = useScores(roundId!, groupId!)
   const navigate = useNavigate()
 
@@ -60,6 +61,12 @@ export function GroupPage() {
   const isCreator = round.createdBy === uid
   const isInGroup = group.golferIds.includes(uid)
   const isBestBall = round.roundType === 'BEST_BALL_GROSS' || round.roundType === 'BEST_BALL_NET'
+  const isScramble = round.scoringFormat === 'scramble'
+  const scrambleAdminId = group.groupAdminId ?? group.golferIds[0]
+
+  // Uneven group size warning for scramble
+  const unevenScrambleGroups = isScramble && allGroups.length > 1 &&
+    new Set(allGroups.map((g) => g.golferIds.length)).size > 1
   const isTwoTeamBestBall = round.scoringFormat === 'two_team' && (
     round.roundType === 'TWO_TEAM_BB_MATCH_GROSS' ||
     round.roundType === 'TWO_TEAM_BB_MATCH_NET' ||
@@ -162,7 +169,7 @@ export function GroupPage() {
             </div>
           </div>
         ) : (
-          <div className="flex items-start justify-between">
+          <div className="flex items-stretch justify-between">
             <div>
               <h1 className="text-xl font-bold text-white">{group.name ?? 'Group'}</h1>
               <p className="text-gray-400 text-sm">{round.courseName}</p>
@@ -173,11 +180,11 @@ export function GroupPage() {
                 <button
                   type="button"
                   onClick={handleStartEdit}
-                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  className="text-gray-400 hover:text-white transition-colors px-2 py-1 self-stretch flex items-center"
                   aria-label="Edit group name"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" />
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487z" />
                   </svg>
                 </button>
               )}
@@ -196,14 +203,20 @@ export function GroupPage() {
             const sc = scores.find((s) => s.golferId === gid)
             const showScore = group.status !== 'pending' && sc
             return (
-              <PlayerSlot
-                key={gid}
-                golferId={gid}
-                isCreator={round.createdBy === gid}
-                fallbackName={sc?.golferName}
-                score={showScore ? (sc.totalGross ?? undefined) : undefined}
-                holesPlayed={showScore ? sc.scores.length : undefined}
-              />
+              <div key={gid} className="flex items-center gap-2">
+                <div className="flex-1">
+                  <PlayerSlot
+                    golferId={gid}
+                    isCreator={round.createdBy === gid}
+                    fallbackName={sc?.golferName}
+                    score={showScore ? (sc.totalGross ?? undefined) : undefined}
+                    holesPlayed={showScore ? sc.scores.length : undefined}
+                  />
+                </div>
+                {isScramble && gid === scrambleAdminId && (
+                  <Badge label="Admin" variant="yellow" />
+                )}
+              </div>
             )
           })}
           {group.golferIds.length < 4 && group.status === 'pending' && (
@@ -225,6 +238,11 @@ export function GroupPage() {
       {/* Start group button */}
       {group.status === 'pending' && isCreator && isInGroup && (
         <div className="flex flex-col gap-2">
+          {unevenScrambleGroups && (
+            <p className="text-xs text-center text-yellow-500">
+              ⚠ Groups have uneven sizes. This is allowed but may affect fairness.
+            </p>
+          )}
           <Button loading={starting} onClick={handleStart} className="w-full" disabled={!teamsValid}>
             Start Round
           </Button>

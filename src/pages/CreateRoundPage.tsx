@@ -68,6 +68,14 @@ const TWO_TEAM_TYPES: { value: RoundType; label: string; detail: string }[] = [
   },
 ]
 
+const SCRAMBLE_TYPES: { value: RoundType; label: string; detail: string }[] = [
+  {
+    value: 'SCRAMBLE_GROSS',
+    label: 'Scramble',
+    detail: 'All players hit each shot, the best shot is selected and everyone plays from that spot. One shared group score is recorded per hole. Scores do not affect handicaps.',
+  },
+]
+
 export function CreateRoundPage() {
   const { currentUser } = useAuth()
   const { courses } = useCourses()
@@ -75,6 +83,7 @@ export function CreateRoundPage() {
   const [error, setError] = useState('')
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>('individual')
   const [showInfo, setShowInfo] = useState(false)
+  const [showFormatInfo, setShowFormatInfo] = useState(false)
 
   const { register, handleSubmit, watch, control, setValue, formState: { errors, isSubmitting } } = useForm<RoundFormValues>({
     resolver: zodResolver(roundFormSchema),
@@ -90,12 +99,12 @@ export function CreateRoundPage() {
   const selectedRoundType = watch('roundType')
   const selectedCourse = courses.find((c) => c.courseId === selectedCourseId)
   const teeOptions = selectedCourse?.tees.map((t) => ({ value: t.teeId, label: t.name })) ?? []
-  const typeOptions = scoringFormat === 'individual' ? INDIVIDUAL_TYPES : TWO_TEAM_TYPES
+  const typeOptions = scoringFormat === 'individual' ? INDIVIDUAL_TYPES : scoringFormat === 'two_team' ? TWO_TEAM_TYPES : SCRAMBLE_TYPES
 
   function handleFormatChange(fmt: ScoringFormat) {
     setScoringFormat(fmt)
     setValue('scoringFormat', fmt)
-    const defaultType = fmt === 'individual' ? 'STROKE_GROSS' : 'TWO_TEAM_STROKE_GROSS'
+    const defaultType = fmt === 'individual' ? 'STROKE_GROSS' : fmt === 'two_team' ? 'TWO_TEAM_STROKE_GROSS' : 'SCRAMBLE_GROSS'
     setValue('roundType', defaultType)
   }
 
@@ -123,6 +132,32 @@ export function CreateRoundPage() {
       <h1 className="text-2xl font-bold text-white">Create Round</h1>
 
       {error && <Alert message={error} />}
+
+      {/* Scoring Format Info Modal */}
+      {showFormatInfo && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg bg-gray-800 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <h2 className="text-base font-semibold text-white">Scoring Formats</h2>
+              <button onClick={() => setShowFormatInfo(false)} className="text-gray-400 hover:text-white text-xl leading-none">×</button>
+            </div>
+            <div className="overflow-y-auto max-h-[70vh] divide-y divide-gray-700">
+              <div className="px-4 py-4">
+                <p className="text-sm font-semibold text-white mb-1">Individual</p>
+                <p className="text-sm text-gray-400 leading-relaxed">Each player competes on their own. Scores are tracked per player and count toward handicap calculation.</p>
+              </div>
+              <div className="px-4 py-4">
+                <p className="text-sm font-semibold text-white mb-1">Two Team</p>
+                <p className="text-sm text-gray-400 leading-relaxed">All players are divided into two event-wide teams (Team A and Team B). Various formats are available including stroke play and best ball match play.</p>
+              </div>
+              <div className="px-4 py-4">
+                <p className="text-sm font-semibold text-white mb-1">Scramble</p>
+                <p className="text-sm text-gray-400 leading-relaxed">Each group records one shared score. All players hit each shot, the best shot is selected, and everyone plays from that spot. Groups can be any size. Scores do not affect handicaps.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Round Type Info Modal */}
       {showInfo && (
@@ -157,20 +192,30 @@ export function CreateRoundPage() {
 
           {/* Scoring Format */}
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-gray-300">Scoring Format</span>
-            <div className="grid grid-cols-2 gap-2">
-              {(['individual', 'two_team'] as ScoringFormat[]).map((fmt) => (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-300">Scoring Format</span>
+              <button
+                type="button"
+                onClick={() => setShowFormatInfo(true)}
+                className="w-5 h-5 rounded-full border border-green-500 text-green-400 hover:text-white hover:bg-green-500 text-xs font-bold leading-none flex items-center justify-center transition-colors"
+                aria-label="Scoring format descriptions"
+              >
+                i
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['individual', 'two_team', 'scramble'] as ScoringFormat[]).map((fmt) => (
                 <button
                   key={fmt}
                   type="button"
                   onClick={() => handleFormatChange(fmt)}
-                  className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
+                  className={`py-3 px-2 rounded-xl border-2 text-sm font-semibold transition-all text-center ${
                     scoringFormat === fmt
                       ? 'border-green-500 bg-green-500/10 text-green-400'
                       : 'border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500'
                   }`}
                 >
-                  {fmt === 'individual' ? 'Individual' : 'Two Team'}
+                  {fmt === 'individual' ? 'Individual' : fmt === 'two_team' ? 'Two Team' : 'Scramble'}
                 </button>
               ))}
             </div>

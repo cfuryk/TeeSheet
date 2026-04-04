@@ -10,6 +10,7 @@ export interface Group {
   name: string | null
   golferIds: string[]
   teams: { teamA: string[]; teamB: string[] } | null
+  groupAdminId?: string
   status: GroupStatus
   createdAt: Timestamp
   updatedAt: Timestamp

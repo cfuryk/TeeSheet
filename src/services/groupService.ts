@@ -36,6 +36,7 @@ export const groupService = {
       name: autoName,
       golferIds: [firstGolferId],
       teams: null,
+      groupAdminId: firstGolferId,
       status: 'pending' as GroupStatus,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -152,20 +153,16 @@ export const groupService = {
 
     const batch = writeBatch(db)
 
-    for (const golferId of group.golferIds) {
-      const profile = await userService.getProfile(golferId)
-      if (!profile) continue
-      const handicapIndex = round.eventId
-        ? (eventHandicaps[golferId] ?? 0)
-        : (profile.teeSheetHandicap ?? 0)
-      const courseHandicap = calculateCourseHandicap(handicapIndex, tee.slope, tee.rating, tee.par)
-      const strokeAllocation = buildStrokeAllocation(courseHandicap, tee.holes)
-      const scoreRef = doc(db, 'rounds', roundId, 'groups', groupId, 'scores', golferId)
+    if (round.scoringFormat === 'scramble') {
+      // Scramble: one shared score doc keyed to the group admin
+      const adminId = group.groupAdminId ?? group.golferIds[0]
+      const adminProfile = await userService.getProfile(adminId)
+      const scoreRef = doc(db, 'rounds', roundId, 'groups', groupId, 'scores', adminId)
       const score: Omit<Score, 'updatedAt'> & { updatedAt: ReturnType<typeof serverTimestamp> } = {
-        golferId,
-        golferName: profile.displayName,
-        courseHandicap,
-        strokeAllocation,
+        golferId: adminId,
+        golferName: group.name ?? 'Group',
+        courseHandicap: 0,
+        strokeAllocation: Array(18).fill(0),
         scores: [],
         totalGross: null,
         totalNet: null,
@@ -174,7 +171,34 @@ export const groupService = {
         isLocked: false,
         updatedAt: serverTimestamp(),
       }
+      // Suppress unused variable warning
+      void adminProfile
       batch.set(scoreRef, score)
+    } else {
+      for (const golferId of group.golferIds) {
+        const profile = await userService.getProfile(golferId)
+        if (!profile) continue
+        const handicapIndex = round.eventId
+          ? (eventHandicaps[golferId] ?? 0)
+          : (profile.teeSheetHandicap ?? 0)
+        const courseHandicap = calculateCourseHandicap(handicapIndex, tee.slope, tee.rating, tee.par)
+        const strokeAllocation = buildStrokeAllocation(courseHandicap, tee.holes)
+        const scoreRef = doc(db, 'rounds', roundId, 'groups', groupId, 'scores', golferId)
+        const score: Omit<Score, 'updatedAt'> & { updatedAt: ReturnType<typeof serverTimestamp> } = {
+          golferId,
+          golferName: profile.displayName,
+          courseHandicap,
+          strokeAllocation,
+          scores: [],
+          totalGross: null,
+          totalNet: null,
+          signedAt: null,
+          signedBy: null,
+          isLocked: false,
+          updatedAt: serverTimestamp(),
+        }
+        batch.set(scoreRef, score)
+      }
     }
 
     batch.update(groupDocPath(roundId, groupId), {
@@ -198,10 +222,19 @@ export const groupService = {
     const group = await groupService.getGroup(roundId, groupId)
     if (!group) return
 
-    const allSigned = group.golferIds.every((uid) => {
-      const s = scores.find((sc) => sc.golferId === uid)
-      return s?.isLocked === true
-    })
+    const round = await roundService.getRound(roundId)
+    if (!round) return
+
+    const isScramble = round.scoringFormat === 'scramble'
+
+    // For scramble: only the admin's score doc needs to be signed
+    // For normal rounds: every golfer in the group must have a signed score
+    const allSigned = isScramble
+      ? scores.every((s) => s.isLocked)
+      : group.golferIds.every((uid) => {
+          const s = scores.find((sc) => sc.golferId === uid)
+          return s?.isLocked === true
+        })
 
     if (allSigned) {
       await updateDoc(groupDocPath(roundId, groupId), {
@@ -209,8 +242,6 @@ export const groupService = {
         updatedAt: serverTimestamp(),
       })
       // Check if all groups in the round are signed
-      const round = await roundService.getRound(roundId)
-      if (!round) return
       const groupsSnap = await getDocs(collection(db, 'rounds', roundId, 'groups'))
       const allGroups = groupsSnap.docs.map((d) => d.data() as Group)
       const allGroupsSigned = round.groupIds.every((gid) => {
@@ -222,34 +253,35 @@ export const groupService = {
           status: 'completed',
           updatedAt: serverTimestamp(),
         })
-        // Write a GolferScore doc for each participant and recalculate handicap
-        const course = await courseService.getCourse(round.courseId)
-        const tee = course?.tees.find((t: { teeId: string }) => t.teeId === round.teeId)
-        if (tee) {
-          for (const uid of round.memberIds ?? []) {
-            // Find the locked score for this golfer across all groups
-            for (const gid of round.groupIds) {
-              const scoreSnap = await getDoc(doc(db, 'rounds', roundId, 'groups', gid, 'scores', uid))
-              if (!scoreSnap.exists()) continue
-              const s = scoreSnap.data() as Score
-              if (!s.isLocked || s.totalGross == null) continue
-              await golferScoreService.addScoreFromFull({
-                golferId: uid,
-                golferName: s.golferName,
-                roundId,
-                courseId: round.courseId,
-                courseName: round.courseName,
-                teeId: round.teeId,
-                teeName: round.teeName,
-                date: round.date,
-                grossScore: s.totalGross,
-                netScore: s.totalNet ?? null,
-                courseRating: tee.rating,
-                slope: tee.slope,
-              })
-              break
+        // Scramble scores do NOT feed into handicap calculation
+        if (!isScramble) {
+          const course = await courseService.getCourse(round.courseId)
+          const tee = course?.tees.find((t: { teeId: string }) => t.teeId === round.teeId)
+          if (tee) {
+            for (const uid of round.memberIds ?? []) {
+              for (const gid of round.groupIds) {
+                const scoreSnap = await getDoc(doc(db, 'rounds', roundId, 'groups', gid, 'scores', uid))
+                if (!scoreSnap.exists()) continue
+                const s = scoreSnap.data() as Score
+                if (!s.isLocked || s.totalGross == null) continue
+                await golferScoreService.addScoreFromFull({
+                  golferId: uid,
+                  golferName: s.golferName,
+                  roundId,
+                  courseId: round.courseId,
+                  courseName: round.courseName,
+                  teeId: round.teeId,
+                  teeName: round.teeName,
+                  date: round.date,
+                  grossScore: s.totalGross,
+                  netScore: s.totalNet ?? null,
+                  courseRating: tee.rating,
+                  slope: tee.slope,
+                })
+                break
+              }
+              userService.recalculateHandicap(uid)
             }
-            userService.recalculateHandicap(uid)
           }
         }
       }

@@ -5,7 +5,7 @@ export const roundFormSchema = z.object({
   courseId: z.string().min(1, 'Select a course'),
   teeId: z.string().min(1, 'Select a tee'),
   date: z.string().min(1, 'Select a date and time'),
-  scoringFormat: z.enum(['individual', 'two_team']),
+  scoringFormat: z.enum(['individual', 'two_team', 'scramble']),
   roundType: z.enum([
     'STROKE_GROSS',
     'STROKE_NET',
@@ -17,6 +17,7 @@ export const roundFormSchema = z.object({
     'TWO_TEAM_BB_MATCH_NET',
     'TWO_TEAM_BB_STROKE_GROSS',
     'TWO_TEAM_BB_STROKE_NET',
+    'SCRAMBLE_GROSS',
   ]),
   isPrivate: z.boolean(),
 })

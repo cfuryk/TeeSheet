@@ -39,6 +39,7 @@ export function roundTypeLabel(type: string): string {
     TWO_TEAM_BB_MATCH_NET: 'Two Team BB Match (Net)',
     TWO_TEAM_BB_STROKE_GROSS: 'Two Team BB Stroke (Gross)',
     TWO_TEAM_BB_STROKE_NET: 'Two Team BB Stroke (Net)',
+    SCRAMBLE_GROSS: 'Scramble',
   }
   return labels[type] ?? type
 }
