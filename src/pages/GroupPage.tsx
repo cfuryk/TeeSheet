@@ -105,7 +105,7 @@ export function GroupPage() {
   }
 
   function handleStartEdit() {
-    setEditName(group.name ?? '')
+    setEditName(group?.name ?? '')
     setEditing(true)
   }
 
@@ -138,8 +138,8 @@ export function GroupPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Back button */}
-      <Button variant="secondary" size="sm" onClick={() => navigate(`/rounds/${roundId}`)}>
-        ← Back to Round
+      <Button onClick={() => navigate(`/rounds/${roundId}`)}>
+        Back to Round
       </Button>
 
       {/* Header */}
@@ -192,9 +192,20 @@ export function GroupPage() {
       <div>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Players</h2>
         <div className="flex flex-col gap-2">
-          {group.golferIds.map((gid) => (
-            <PlayerSlot key={gid} golferId={gid} isCreator={round.createdBy === gid} />
-          ))}
+          {group.golferIds.map((gid) => {
+            const sc = scores.find((s) => s.golferId === gid)
+            const showScore = group.status !== 'pending' && sc
+            return (
+              <PlayerSlot
+                key={gid}
+                golferId={gid}
+                isCreator={round.createdBy === gid}
+                fallbackName={sc?.golferName}
+                score={showScore ? (sc.totalGross ?? undefined) : undefined}
+                holesPlayed={showScore ? sc.scores.length : undefined}
+              />
+            )
+          })}
           {group.golferIds.length < 4 && group.status === 'pending' && (
             <PlayerSlot golferId={null} />
           )}

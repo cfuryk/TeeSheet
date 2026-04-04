@@ -6,9 +6,10 @@ interface Props {
   scores: Score[]
   holes: Hole[]
   isNet: boolean
+  currentHole?: number
 }
 
-export function GroupScoreSummary({ scores, holes, isNet }: Props) {
+export function GroupScoreSummary({ scores, holes, isNet, currentHole }: Props) {
   if (scores.length === 0) return null
 
   return (
@@ -21,12 +22,22 @@ export function GroupScoreSummary({ scores, holes, isNet }: Props) {
           const net = sc.scores.reduce((s, h) => s + h.netScore, 0)
           const vsParGross = calculateTotalVsPar(sc.scores, holes)
           const vsParNet = calculateTotalNetVsPar(sc.scores, holes)
+          const strokesOnCurrentHole = currentHole !== undefined
+            ? (sc.strokeAllocation[currentHole - 1] ?? 0)
+            : 0
 
           return (
             <div key={sc.golferId} className="flex items-center justify-between">
-              <div>
+              <div className="flex items-center gap-1.5">
                 <span className="font-medium text-sm text-white">{sc.golferName}</span>
-                <span className="text-xs text-gray-500 ml-1">({holesPlayed}/18)</span>
+                {isNet && strokesOnCurrentHole > 0 && (
+                  <span className="flex gap-0.5">
+                    {Array.from({ length: strokesOnCurrentHole }).map((_, i) => (
+                      <span key={i} className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+                    ))}
+                  </span>
+                )}
+                <span className="text-xs text-gray-500">({holesPlayed}/18)</span>
               </div>
               <div className="flex gap-3 items-center">
                 <div className="text-center">

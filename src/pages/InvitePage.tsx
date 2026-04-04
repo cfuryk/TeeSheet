@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { inviteService } from '@/services/inviteService'
-import { Spinner, Alert, Button } from '@/components/ui'
+import { Spinner, Alert } from '@/components/ui'
 import type { Invite } from '@/types'
 
 export function InvitePage() {

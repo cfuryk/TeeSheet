@@ -1,11 +1,11 @@
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import type React from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useRound } from '@/hooks/useRound'
 import { useGroups } from '@/hooks/useGroup'
 import { courseService } from '@/services/courseService'
 import { scoreService } from '@/services/scoreService'
-import { useEffect, useState } from 'react'
 import type { Score, Tee, Group } from '@/types'
-import { ScorecardGrid } from '@/components/scorecard/ScorecardGrid'
 import { Card, Spinner } from '@/components/ui'
 import {
   formatVsPar,
@@ -19,6 +19,7 @@ import {
 
 export function RoundSummaryPage() {
   const { roundId } = useParams<{ roundId: string }>()
+  const navigate = useNavigate()
   const { round, loading: roundLoading } = useRound(roundId!)
   const { groups, loading: groupsLoading } = useGroups(roundId!)
   const [allScores, setAllScores] = useState<Score[]>([])
@@ -50,20 +51,18 @@ export function RoundSummaryPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-white">Signed Scorecard</h1>
+      <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
 
       {scoringFormat === 'two_team'
-        ? <TwoTeamLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} />
-        : <IndividualLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} />
+        ? <TwoTeamLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
+        : <IndividualLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
       }
 
-      <ScorecardGrid scores={allScores} holes={tee.holes} isNet={useNet} />
-
       <Link
-        to="/"
+        to={`/rounds/${roundId}`}
         className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors"
       >
-        Back to Tee Sheet
+        Back to Round
       </Link>
     </div>
   )
@@ -71,59 +70,59 @@ export function RoundSummaryPage() {
 
 // ─── Individual leaderboard ────────────────────────────────────────────────
 
-function IndividualLeaderboard({ round, groups, allScores, tee, useNet }: {
+function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId, navigate }: {
   round: import('@/types').Round
   groups: Group[]
   allScores: Score[]
   tee: Tee
   useNet: boolean
+  roundId: string
+  navigate: ReturnType<typeof useNavigate>
 }) {
   const isBestBall = round.roundType === 'BEST_BALL_GROSS' || round.roundType === 'BEST_BALL_NET'
 
   if (isBestBall) {
-    // Build team pairs from group-level teams, rank by best ball total
-    const pairs: { names: string; total: number | null }[] = []
+    const pairs: { names: string; leadId: string; total: number | null; vsPar: number | null }[] = []
+    const totalPar = tee.holes.reduce((s, h) => s + h.par, 0)
     for (const group of groups) {
-      const teams = [
-        { ids: group.teams?.teamA ?? [], label: 'A' },
-        { ids: group.teams?.teamB ?? [], label: 'B' },
-      ]
-      for (const team of teams) {
-        if (team.ids.length === 0) continue
-        const names = team.ids
-          .map((id) => allScores.find((s) => s.golferId === id)?.golferName ?? id)
-          .join(' / ')
-        const total = bestBallGroupScore(team.ids, allScores, tee.holes, useNet)
-        pairs.push({ names, total })
+      for (const teamIds of [group.teams?.teamA ?? [], group.teams?.teamB ?? []]) {
+        if (teamIds.length === 0) continue
+        const members = allScores.filter((s) => teamIds.includes(s.golferId))
+        const names = members.map((s) => s.golferName).join(' / ')
+        const total = bestBallGroupScore(teamIds, allScores, tee.holes, useNet)
+        const vsPar = total !== null ? total - totalPar : null
+        pairs.push({ names, leadId: teamIds[0], total, vsPar })
       }
     }
     pairs.sort((a, b) => (a.total ?? 999) - (b.total ?? 999))
-    const totalPar = tee.holes.reduce((s, h) => s + h.par, 0)
 
     return (
       <Card className="p-4">
         <h3 className="font-semibold text-gray-400 mb-3">Best Ball Leaderboard</h3>
         <div className="flex flex-col gap-2">
           {pairs.map((pair, i) => (
-            <div key={pair.names} className={`flex items-center justify-between py-2 ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>
-              <span className="flex items-center gap-2">
-                <span className="text-lg">{i === 0 ? '🏆' : `${i + 1}.`}</span>
-                {pair.names}
+            <button
+              key={pair.leadId}
+              type="button"
+              onClick={() => navigate(`/rounds/${roundId}/scorecard/${pair.leadId}`)}
+              className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
+                <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{pair.names}</span>
               </span>
-              <span className="font-mono text-right">
-                {pair.total ?? '-'}
-                {pair.total !== null && (
-                  <span className="ml-2 text-sm text-gray-500">({formatVsPar(pair.total - totalPar)})</span>
-                )}
+              <span className="flex items-center gap-0 shrink-0 ml-3">
+                <span className="font-mono w-8 text-right text-white">{pair.total ?? '-'}</span>
+                <span className="font-mono w-14 text-right text-sm text-gray-400">{pair.vsPar !== null ? `(${formatVsPar(pair.vsPar)})` : ''}</span>
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </Card>
     )
   }
 
-  // Stroke play individual
+  // Stroke play
   const leaderboard = [...allScores].sort((a, b) => {
     const aScore = useNet ? (a.totalNet ?? 999) : (a.totalGross ?? 999)
     const bScore = useNet ? (b.totalNet ?? 999) : (b.totalGross ?? 999)
@@ -140,16 +139,21 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet }: {
             ? calculateTotalNetVsPar(sc.scores, tee.holes)
             : calculateTotalVsPar(sc.scores, tee.holes)
           return (
-            <div key={sc.golferId} className={`flex items-center justify-between py-2 ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>
-              <span className="flex items-center gap-2">
-                <span className="text-lg">{i === 0 ? '🏆' : `${i + 1}.`}</span>
-                {sc.golferName}
+            <button
+              key={sc.golferId}
+              type="button"
+              onClick={() => navigate(`/rounds/${roundId}/scorecard/${sc.golferId}`)}
+              className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
+                <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{sc.golferName}</span>
               </span>
-              <span className="text-right">
-                <span className="font-mono">{total ?? '-'}</span>
-                <span className="ml-2 text-sm text-gray-500">({formatVsPar(vsPar)})</span>
+              <span className="flex items-center shrink-0 ml-3">
+                <span className="font-mono w-8 text-right text-white">{total ?? '-'}</span>
+                <span className="font-mono w-14 text-right text-sm text-gray-400">({formatVsPar(vsPar)})</span>
               </span>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -159,12 +163,14 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet }: {
 
 // ─── Two Team leaderboard ──────────────────────────────────────────────────
 
-function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet }: {
+function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, navigate }: {
   round: import('@/types').Round
   groups: Group[]
   allScores: Score[]
   tee: Tee
   useNet: boolean
+  roundId: string
+  navigate: ReturnType<typeof useNavigate>
 }) {
   const assignments = round.teamAssignments ?? {}
   const rt = round.roundType
@@ -173,82 +179,103 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet }: {
   const isBestBallStroke = rt === 'TWO_TEAM_BB_STROKE_GROSS' || rt === 'TWO_TEAM_BB_STROKE_NET'
   const isStroke = rt === 'TWO_TEAM_STROKE_GROSS' || rt === 'TWO_TEAM_STROKE_NET'
 
-  if (isMatchPlay) {
-    // Per-group points, then overall team points
-    let totalA = 0
-    let totalB = 0
-    const groupResults: { name: string; aPoints: number; bPoints: number }[] = []
+  const teamAScores = allScores.filter((s) => assignments[s.golferId] === 'A')
+  const teamBScores = allScores.filter((s) => assignments[s.golferId] === 'B')
 
+  let teamSection: React.ReactNode = null
+
+  if (isMatchPlay) {
+    let totalA = 0, totalB = 0
+    const groupResults: { name: string; aPoints: number; bPoints: number }[] = []
     for (const group of groups) {
       const teamAIds = group.golferIds.filter((id) => assignments[id] === 'A')
       const teamBIds = group.golferIds.filter((id) => assignments[id] === 'B')
       const groupScores = allScores.filter((sc) => group.golferIds.includes(sc.golferId))
       const { aPoints, bPoints } = matchPlayPoints(teamAIds, teamBIds, groupScores, tee.holes, useNet)
-      const aWins = aPoints > bPoints
-      const bWins = bPoints > aPoints
-      const roundA = aWins ? 1 : bWins ? 0 : 0.5
-      const roundB = bWins ? 1 : aWins ? 0 : 0.5
-      totalA += roundA
-      totalB += roundB
+      const aWins = aPoints > bPoints, bWins = bPoints > aPoints
+      totalA += aWins ? 1 : bWins ? 0 : 0.5
+      totalB += bWins ? 1 : aWins ? 0 : 0.5
       groupResults.push({ name: group.name ?? 'Group', aPoints, bPoints })
     }
-
-    return (
-      <Card className="p-4 flex flex-col gap-4">
-        <div>
-          <h3 className="font-semibold text-gray-400 mb-3">Overall Result</h3>
-          <div className="flex gap-4">
-            <TeamScoreTile label="Team A" points={totalA} winner={totalA > totalB} />
-            <TeamScoreTile label="Team B" points={totalB} winner={totalB > totalA} />
-          </div>
+    teamSection = (
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-4">
+          <TeamScoreTile label="Team A" points={totalA} winner={totalA > totalB} />
+          <TeamScoreTile label="Team B" points={totalB} winner={totalB > totalA} />
         </div>
-        <div>
-          <h3 className="font-semibold text-gray-400 mb-2">Group Results</h3>
-          <div className="flex flex-col gap-2">
-            {groupResults.map((gr) => (
-              <div key={gr.name} className="flex items-center justify-between text-sm text-white">
-                <span>{gr.name}</span>
-                <span className="font-mono">A: {gr.aPoints} — B: {gr.bPoints}</span>
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-col gap-1">
+          {groupResults.map((gr) => (
+            <div key={gr.name} className="flex items-center justify-between text-sm text-gray-400 px-1">
+              <span>{gr.name}</span>
+              <span className="font-mono">A: {gr.aPoints} — B: {gr.bPoints}</span>
+            </div>
+          ))}
         </div>
-      </Card>
+      </div>
     )
-  }
-
-  if (isBestBallStroke) {
+  } else if (isBestBallStroke) {
     const groupGolferIds = groups.map((g) => g.golferIds)
     const scoreA = twoTeamBestBallAggregateScore('A', assignments, groupGolferIds, allScores, tee.holes, useNet)
     const scoreB = twoTeamBestBallAggregateScore('B', assignments, groupGolferIds, allScores, tee.holes, useNet)
-    return (
-      <Card className="p-4">
-        <h3 className="font-semibold text-gray-400 mb-3">Team Best Ball Totals</h3>
-        <div className="flex gap-4">
-          <TeamScoreTile label="Team A" score={scoreA} winner={scoreA < scoreB} />
-          <TeamScoreTile label="Team B" score={scoreB} winner={scoreB < scoreA} />
-        </div>
-      </Card>
+    teamSection = (
+      <div className="flex gap-4">
+        <TeamScoreTile label="Team A" score={scoreA} winner={scoreA < scoreB} />
+        <TeamScoreTile label="Team B" score={scoreB} winner={scoreB < scoreA} />
+      </div>
     )
-  }
-
-  if (isStroke) {
+  } else if (isStroke) {
     const scoreA = twoTeamAggregateScore('A', assignments, allScores, useNet)
     const scoreB = twoTeamAggregateScore('B', assignments, allScores, useNet)
-    const countA = allScores.filter((s) => assignments[s.golferId] === 'A').length
-    const countB = allScores.filter((s) => assignments[s.golferId] === 'B').length
-    return (
-      <Card className="p-4">
-        <h3 className="font-semibold text-gray-400 mb-3">Team Totals</h3>
-        <div className="flex gap-4">
-          <TeamScoreTile label="Team A" score={scoreA} avg={countA > 0 ? scoreA / countA : null} winner={scoreA < scoreB} />
-          <TeamScoreTile label="Team B" score={scoreB} avg={countB > 0 ? scoreB / countB : null} winner={scoreB < scoreA} />
-        </div>
-      </Card>
+    const countA = teamAScores.length, countB = teamBScores.length
+    teamSection = (
+      <div className="flex gap-4">
+        <TeamScoreTile label="Team A" score={scoreA} avg={countA > 0 ? scoreA / countA : null} winner={scoreA < scoreB} />
+        <TeamScoreTile label="Team B" score={scoreB} avg={countB > 0 ? scoreB / countB : null} winner={scoreB < scoreA} />
+      </div>
     )
   }
 
-  return null
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="p-4 flex flex-col gap-4">
+        {teamSection}
+      </Card>
+
+      {/* Per-team player lists */}
+      {[{ label: 'Team A', scores: teamAScores }, { label: 'Team B', scores: teamBScores }].map(({ label, scores }) => (
+        <Card key={label} className="p-4">
+          <h3 className="font-semibold text-gray-400 mb-3">{label}</h3>
+          <div className="flex flex-col gap-2">
+            {scores
+              .sort((a, b) => ((useNet ? a.totalNet : a.totalGross) ?? 999) - ((useNet ? b.totalNet : b.totalGross) ?? 999))
+              .map((sc, i) => {
+                const total = useNet ? sc.totalNet : sc.totalGross
+                const vsPar = useNet
+                  ? calculateTotalNetVsPar(sc.scores, tee.holes)
+                  : calculateTotalVsPar(sc.scores, tee.holes)
+                return (
+                  <button
+                    key={sc.golferId}
+                    type="button"
+                    onClick={() => navigate(`/rounds/${roundId}/scorecard/${sc.golferId}`)}
+                    className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm text-white w-5 shrink-0">{i + 1}.</span>
+                      <span className="text-white truncate">{sc.golferName}</span>
+                    </span>
+                    <span className="flex items-center shrink-0 ml-3">
+                      <span className="font-mono w-8 text-right text-white">{total ?? '-'}</span>
+                      <span className="font-mono w-14 text-right text-sm text-gray-400">({formatVsPar(vsPar)})</span>
+                    </span>
+                  </button>
+                )
+              })}
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
 }
 
 function TeamScoreTile({ label, score, avg, points, winner }: {

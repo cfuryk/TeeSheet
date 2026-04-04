@@ -26,7 +26,7 @@ export function ScorecardPage() {
   const holeIndex = currentHole - 1
   const myStrokes = myScore?.strokeAllocation[holeIndex] ?? 0
   const myHoleScore = myScore?.scores.find((s) => s.hole === currentHole)
-  const isNetRound = round.roundType === 'STROKE_NET' || round.roundType === 'BEST_BALL_NET'
+  const isNetRound = round.roundType.includes('NET')
   const allHolesScored = scores.length > 0 && scores.every((s) => s.scores.length === 18)
 
   async function handleScoreSelect(grossScore: number) {
@@ -59,7 +59,7 @@ export function ScorecardPage() {
         onPrev={() => setCurrentHole((h) => Math.max(1, h - 1))}
         onNext={() => setCurrentHole((h) => Math.min(18, h + 1))}
       />
-      <GroupScoreSummary scores={scores} holes={tee.holes} isNet={isNetRound} />
+      <GroupScoreSummary scores={scores} holes={tee.holes} isNet={isNetRound} currentHole={currentHole} />
       {allHolesScored && (
         <Button
           variant="primary"

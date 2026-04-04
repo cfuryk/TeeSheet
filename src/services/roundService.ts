@@ -4,6 +4,7 @@ import {
   addDoc,
   updateDoc,
   getDoc,
+  getDocs,
   deleteDoc,
   query,
   where,
@@ -148,6 +149,12 @@ export const roundService = {
       const rounds = snap.docs.map((d) => ({ roundId: d.id, ...d.data() }) as Round)
       callback(autoCloseStale(rounds))
     })
+  },
+
+  async getSeededRounds(): Promise<Round[]> {
+    const q = query(collection(db, 'rounds'), where('__seeded', '==', true))
+    const snap = await getDocs(q)
+    return snap.docs.map((d) => ({ roundId: d.id, ...d.data() }) as Round)
   },
 
   async updateTeamAssignments(

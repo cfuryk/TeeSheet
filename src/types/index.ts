@@ -1,6 +1,7 @@
 export type { UserProfile, UserProfileUpdate } from './user'
 export type { Hole, Tee, Course, CourseFormData, TeeFormData } from './course'
 export type {
+  ScoringFormat,
   RoundType,
   RoundStatus,
   Team,

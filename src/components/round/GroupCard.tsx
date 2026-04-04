@@ -46,3 +46,4 @@ export function GroupCard({ group, roundId, currentUserId }: Props) {
     </button>
   )
 }
+

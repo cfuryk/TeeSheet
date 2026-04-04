@@ -16,6 +16,7 @@ import { GroupPage } from '@/pages/GroupPage'
 import { ScorecardPage } from '@/pages/ScorecardPage'
 import { SigningPage } from '@/pages/SigningPage'
 import { RoundSummaryPage } from '@/pages/RoundSummaryPage'
+import { PlayerScorecardPage } from '@/pages/PlayerScorecardPage'
 import { CreateEventPage } from '@/pages/CreateEventPage'
 import { EventDetailPage } from '@/pages/EventDetailPage'
 import { MyRoundsPage } from '@/pages/MyRoundsPage'
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/rounds/:roundId/groups/:groupId/scorecard" element={<ProtectedRoute><ScorecardPage /></ProtectedRoute>} />
             <Route path="/rounds/:roundId/groups/:groupId/sign" element={<ProtectedRoute><SigningPage /></ProtectedRoute>} />
             <Route path="/rounds/:roundId/summary" element={<ProtectedRoute><RoundSummaryPage /></ProtectedRoute>} />
+            <Route path="/rounds/:roundId/scorecard/:golferId" element={<ProtectedRoute><PlayerScorecardPage /></ProtectedRoute>} />
 
             {/* Redirect old lobby URL */}
             <Route path="/rounds/:roundId/lobby" element={<Navigate to=".." relative="path" replace />} />

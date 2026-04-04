@@ -6,12 +6,17 @@ import { useRound } from '@/hooks/useRound'
 import { useGroups } from '@/hooks/useGroup'
 import { groupService } from '@/services/groupService'
 import { roundService } from '@/services/roundService'
+import { scoreService } from '@/services/scoreService'
 import { golferScoreService } from '@/services/golferScoreService'
 import { GroupCard } from '@/components/round/GroupCard'
 import { ManageGroupsModal } from '@/components/round/ManageGroupsModal'
 import { Button, Spinner, Alert, Badge } from '@/components/ui'
 import { formatDate, roundTypeLabel } from '@/lib/formatters'
-import type { UserProfile } from '@/types'
+import {
+  matchPlayPoints,
+  twoTeamAggregateScore,
+} from '@/lib/scoring'
+import type { UserProfile, Score } from '@/types'
 
 export function RoundDetailPage() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -25,6 +30,7 @@ export function RoundDetailPage() {
   const [error, setError] = useState('')
   const [savingTeams, setSavingTeams] = useState(false)
   const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({})
+  const [allScores, setAllScores] = useState<Score[]>([])
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -37,6 +43,13 @@ export function RoundDetailPage() {
       setMemberProfiles(map)
     })
   }, [round])
+
+  useEffect(() => {
+    if (!round || round.status !== 'completed' || groups.length === 0) return
+    Promise.all(
+      groups.map((g) => scoreService.getAllScores(round.roundId, g.groupId))
+    ).then((results) => setAllScores(results.flat()))
+  }, [round, groups])
 
   if (roundLoading || groupsLoading) {
     return (
@@ -56,6 +69,10 @@ export function RoundDetailPage() {
   const isAdmin = userProfile?.isAdmin ?? false
   const canManage = (isCreator || isAdmin) && round.status === 'pending'
   const userGroup = groups.find((g) => g.golferIds.includes(uid))
+  const isCompleted = round.status === 'completed'
+
+  // Compute winner summary for completed rounds
+  const winnerSummary = isCompleted && allScores.length > 0 ? computeWinner(round, groups, allScores) : null
 
   async function handleJoin() {
     setJoining(true)
@@ -157,6 +174,24 @@ export function RoundDetailPage() {
         </div>
       )}
 
+      {/* Winner banner + leaderboard button for completed rounds */}
+      {isCompleted && !round.simpleGrossScore && (
+        <div className="flex flex-col gap-4">
+          {winnerSummary && (
+            <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-xl">🏆</span>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Winner</p>
+                <p className="text-white font-semibold">{winnerSummary}</p>
+              </div>
+            </div>
+          )}
+          <Button onClick={() => navigate(`/rounds/${round.roundId}/summary`)}>
+            Leaderboard & Scorecards
+          </Button>
+        </div>
+      )}
+
       {/* Groups */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -195,12 +230,6 @@ export function RoundDetailPage() {
       </div>
 
       {/* Creator/admin actions */}
-      {isCreator && round.status === 'completed' && !round.simpleGrossScore && (
-        <Button variant="secondary" onClick={() => navigate(`/rounds/${round.roundId}/summary`)}>
-          View Summary
-        </Button>
-      )}
-
       {canManage && (
         <>
           <Button variant="secondary" onClick={() => navigate(`/rounds/${round.roundId}/edit`)}>
@@ -247,4 +276,72 @@ export function RoundDetailPage() {
       )}
     </div>
   )
+}
+
+// ─── Winner computation ────────────────────────────────────────────────────────
+
+function computeWinner(
+  round: import('@/types').Round,
+  groups: import('@/types').Group[],
+  allScores: Score[],
+): string | null {
+  const rt = round.roundType
+  const useNet = rt.includes('NET')
+  const assignments = round.teamAssignments ?? {}
+
+  // Individual stroke play
+  if (rt === 'STROKE_GROSS' || rt === 'STROKE_NET') {
+    const sorted = [...allScores].sort((a, b) =>
+      ((useNet ? a.totalNet : a.totalGross) ?? 999) - ((useNet ? b.totalNet : b.totalGross) ?? 999)
+    )
+    if (sorted.length === 0) return null
+    const winner = sorted[0]
+    const score = useNet ? winner.totalNet : winner.totalGross
+    return `${winner.golferName} (${score})`
+  }
+
+  // Individual best ball — use totalGross/Net directly (best ball per hole needs tee data,
+  // so we approximate by comparing pair totals which is close enough for a winner callout)
+  if (rt === 'BEST_BALL_GROSS' || rt === 'BEST_BALL_NET') {
+    const pairs: { names: string; total: number }[] = []
+    for (const group of groups) {
+      for (const teamIds of [group.teams?.teamA ?? [], group.teams?.teamB ?? []]) {
+        if (teamIds.length === 0) continue
+        const names = teamIds.map((id) => allScores.find((s) => s.golferId === id)?.golferName ?? id).join(' / ')
+        const members = allScores.filter((s) => teamIds.includes(s.golferId))
+        if (members.length === 0) continue
+        // Best of the two totals as proxy (full best-ball calc needs hole data)
+        const total = Math.min(...members.map((s) => (useNet ? s.totalNet : s.totalGross) ?? 999))
+        pairs.push({ names, total })
+      }
+    }
+    pairs.sort((a, b) => a.total - b.total)
+    if (pairs.length === 0) return null
+    return `${pairs[0].names} (${pairs[0].total})`
+  }
+
+  // Two team best ball stroke — compare sum of best totals per team
+  if (rt === 'TWO_TEAM_BB_STROKE_GROSS' || rt === 'TWO_TEAM_BB_STROKE_NET') {
+    const scoreA = twoTeamAggregateScore('A', assignments, allScores, useNet)
+    const scoreB = twoTeamAggregateScore('B', assignments, allScores, useNet)
+    if (scoreA === scoreB) return 'Tie — Team A and Team B'
+    return scoreA < scoreB ? `Team A (${scoreA})` : `Team B (${scoreB})`
+  }
+
+  // Two team match play
+  if (rt === 'TWO_TEAM_BB_MATCH_GROSS' || rt === 'TWO_TEAM_BB_MATCH_NET') {
+    let totalA = 0, totalB = 0
+    for (const group of groups) {
+      const teamAIds = group.golferIds.filter((id) => assignments[id] === 'A')
+      const teamBIds = group.golferIds.filter((id) => assignments[id] === 'B')
+      const groupScores = allScores.filter((sc) => group.golferIds.includes(sc.golferId))
+      const { aPoints, bPoints } = matchPlayPoints(teamAIds, teamBIds, groupScores, [], useNet)
+      totalA += aPoints > bPoints ? 1 : aPoints === bPoints ? 0.5 : 0
+      totalB += bPoints > aPoints ? 1 : aPoints === bPoints ? 0.5 : 0
+    }
+    if (totalA === totalB) return `Tie — Team A and Team B (${totalA} pts each)`
+    return totalA > totalB ? `Team A (${totalA} pts)` : `Team B (${totalB} pts)`
+  }
+
+  return null
 }

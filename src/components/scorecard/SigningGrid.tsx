@@ -13,9 +13,10 @@ interface Props {
   groupId: string
   onSign: (uid: string) => void
   signing: string | null
+  isNet?: boolean
 }
 
-export function SigningGrid({ scores, holes, currentUserId, roundId, groupId, onSign, signing }: Props) {
+export function SigningGrid({ scores, holes, currentUserId, roundId, groupId, onSign, signing, isNet = false }: Props) {
   const sorted = [...holes].sort((a, b) => a.number - b.number)
   const totalPar = sorted.reduce((s, h) => s + h.par, 0)
 
@@ -64,6 +65,7 @@ export function SigningGrid({ scores, holes, currentUserId, roundId, groupId, on
                     roundId={roundId}
                     groupId={groupId}
                     uid={sc.golferId}
+                    isNet={isNet}
                   />
                 )
               })}
@@ -105,6 +107,7 @@ function HoleRow({
   roundId,
   groupId,
   uid,
+  isNet,
 }: {
   hole: Hole
   score: number | null
@@ -115,6 +118,7 @@ function HoleRow({
   roundId: string
   groupId: string
   uid: string
+  isNet: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState('')
@@ -150,9 +154,12 @@ function HoleRow({
       className={`flex flex-col divide-y divide-gray-700/30 ${canEdit && !editing ? 'cursor-pointer active:bg-gray-700/40' : ''}`}
       onClick={() => !editing && startEditing()}
     >
-      <div className="flex items-center px-4 py-2 text-sm">
+      <div className="relative flex items-center px-4 py-2 text-sm">
         <span className="w-16 text-gray-400">Hole {hole.number}</span>
         <span className="w-12 text-gray-500 text-center">Par {hole.par}</span>
+        {isNet && strokes > 0 && (
+          <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-green-400" />
+        )}
         {saving ? (
           <span className="ml-auto text-xs text-gray-500">Saving…</span>
         ) : (
@@ -192,15 +199,16 @@ function HoleRow({
   )
 }
 
-function ScoreBadge({ score, vsPar }: { score: number | null; vsPar: number | null }) {
+function ScoreBadge({ score, vsPar, noMargin = false }: { score: number | null; vsPar: number | null; noMargin?: boolean }) {
+  const margin = noMargin ? '' : 'ml-auto'
   if (score === null || vsPar === null) {
-    return <span className="ml-auto font-mono text-gray-600">-</span>
+    return <span className={`${margin} font-mono text-gray-600`}>-</span>
   }
 
   // Eagle or better: red, double circle
   if (vsPar <= -2) {
     return (
-      <span className="ml-auto inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-red-400 outline-offset-[-6px]">
+      <span className={`${margin} inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-red-400 outline-offset-[-6px]`}>
         {score}
       </span>
     )
@@ -208,26 +216,26 @@ function ScoreBadge({ score, vsPar }: { score: number | null; vsPar: number | nu
   // Birdie: red, single circle
   if (vsPar === -1) {
     return (
-      <span className="ml-auto inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400">
+      <span className={`${margin} inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400`}>
         {score}
       </span>
     )
   }
   // Par: plain white
   if (vsPar === 0) {
-    return <span className="ml-auto inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-gray-200">{score}</span>
+    return <span className={`${margin} inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-gray-200`}>{score}</span>
   }
   // Bogey: blue, single square
   if (vsPar === 1) {
     return (
-      <span className="ml-auto inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-blue-400 ring-2 ring-blue-400">
+      <span className={`${margin} inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-blue-400 ring-2 ring-blue-400`}>
         {score}
       </span>
     )
   }
   // Double bogey or worse: blue, double square
   return (
-    <span className="ml-auto inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-blue-400 outline-offset-[-6px]">
+    <span className={`${margin} inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-blue-400 outline-offset-[-6px]`}>
       {score}
     </span>
   )

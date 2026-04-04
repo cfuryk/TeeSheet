@@ -26,7 +26,7 @@ export function AdminUsersPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Admin Users</h2>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/admin')}>Back</Button>
+        <Button variant="primary" size="sm" onClick={() => navigate('/admin')}>Back</Button>
       </div>
       {loading ? (
         <div className="flex justify-center py-12"><Spinner /></div>

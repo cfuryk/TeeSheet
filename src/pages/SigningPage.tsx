@@ -80,6 +80,7 @@ export function SigningPage() {
           groupId={groupId!}
           onSign={handleSign}
           signing={signing}
+          isNet={round.roundType.includes('NET')}
         />
       )}
     </div>
