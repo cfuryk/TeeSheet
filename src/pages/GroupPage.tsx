@@ -60,8 +60,27 @@ export function GroupPage() {
   const isCreator = round.createdBy === uid
   const isInGroup = group.golferIds.includes(uid)
   const isBestBall = round.roundType === 'BEST_BALL_GROSS' || round.roundType === 'BEST_BALL_NET'
+  const isTwoTeamBestBall = round.scoringFormat === 'two_team' && (
+    round.roundType === 'TWO_TEAM_BB_MATCH_GROSS' ||
+    round.roundType === 'TWO_TEAM_BB_MATCH_NET' ||
+    round.roundType === 'TWO_TEAM_BB_STROKE_GROSS' ||
+    round.roundType === 'TWO_TEAM_BB_STROKE_NET'
+  )
   const allHolesScored = !scoresLoading && scores.length > 0 && scores.every((s) => s.scores.length === 18)
   const canEdit = isCreator && group.status === 'pending'
+
+  // For individual best ball: group-level teams must be 2v2
+  const groupTeamsValid = !isBestBall || (
+    group.teams?.teamA.length === 2 && group.teams?.teamB.length === 2
+  )
+  // For two_team best ball: round-level teamAssignments must give exactly 2 A and 2 B in this group
+  const twoTeamGroupValid = !isTwoTeamBestBall || (() => {
+    const assignments = round.teamAssignments ?? {}
+    const groupA = group.golferIds.filter((id) => assignments[id] === 'A')
+    const groupB = group.golferIds.filter((id) => assignments[id] === 'B')
+    return groupA.length === 2 && groupB.length === 2
+  })()
+  const teamsValid = groupTeamsValid && twoTeamGroupValid
 
   async function handleStart() {
     setStarting(true)
@@ -194,9 +213,18 @@ export function GroupPage() {
 
       {/* Start group button */}
       {group.status === 'pending' && isCreator && isInGroup && (
-        <Button loading={starting} onClick={handleStart} className="w-full">
-          Start Round
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button loading={starting} onClick={handleStart} className="w-full" disabled={!teamsValid}>
+            Start Round
+          </Button>
+          {!teamsValid && (
+            <p className="text-xs text-center text-yellow-500">
+              {isTwoTeamBestBall
+                ? 'This group needs exactly 2 players from each team (A and B) before starting.'
+                : 'Assign exactly 2 players to each team before starting.'}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Resume button */}

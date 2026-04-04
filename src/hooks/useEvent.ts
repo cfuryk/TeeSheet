@@ -18,18 +18,35 @@ export function useEvent(eventId: string) {
   return { event, loading }
 }
 
-export function useMyEvents(createdBy: string) {
+export function useMyEvents(uid: string) {
   const [events, setEvents] = useState<GolfEvent[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!createdBy) return
-    const unsub = eventService.onMyEventsSnapshot(createdBy, (evts) => {
-      setEvents(evts)
-      setLoading(false)
+    if (!uid) { setLoading(false); return }
+
+    let created: GolfEvent[] = []
+    let member: GolfEvent[] = []
+    let createdLoaded = false
+    let memberLoaded = false
+
+    function merge() {
+      const map = new Map<string, GolfEvent>()
+      for (const e of [...created, ...member]) map.set(e.eventId, e)
+      const merged = Array.from(map.values()).sort((a, b) => (b.date > a.date ? 1 : -1))
+      setEvents(merged)
+      if (createdLoaded && memberLoaded) setLoading(false)
+    }
+
+    const unsubCreated = eventService.onMyEventsSnapshot(uid, (evts) => {
+      created = evts; createdLoaded = true; merge()
     })
-    return unsub
-  }, [createdBy])
+    const unsubMember = eventService.onMemberEventsSnapshot(uid, (evts) => {
+      member = evts; memberLoaded = true; merge()
+    })
+
+    return () => { unsubCreated(); unsubMember() }
+  }, [uid])
 
   return { events, loading }
 }

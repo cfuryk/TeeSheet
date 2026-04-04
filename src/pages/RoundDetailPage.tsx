@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { userService } from '@/services/userService'
@@ -11,6 +11,7 @@ import { GroupCard } from '@/components/round/GroupCard'
 import { ManageGroupsModal } from '@/components/round/ManageGroupsModal'
 import { Button, Spinner, Alert, Badge } from '@/components/ui'
 import { formatDate, roundTypeLabel } from '@/lib/formatters'
+import type { UserProfile } from '@/types'
 
 export function RoundDetailPage() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -22,7 +23,20 @@ export function RoundDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [managingGroups, setManagingGroups] = useState(false)
   const [error, setError] = useState('')
+  const [savingTeams, setSavingTeams] = useState(false)
+  const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({})
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!round) return
+    Promise.all(
+      (round.memberIds ?? []).map((uid) => userService.getProfile(uid).then((p) => ({ uid, p })))
+    ).then((results) => {
+      const map: Record<string, UserProfile> = {}
+      for (const { uid, p } of results) { if (p) map[uid] = p }
+      setMemberProfiles(map)
+    })
+  }, [round])
 
   if (roundLoading || groupsLoading) {
     return (
@@ -71,6 +85,19 @@ export function RoundDetailPage() {
     }
   }
 
+  async function handleTeamToggle(memberId: string) {
+    if (!round) return
+    const current = round.teamAssignments ?? {}
+    const currentSide = current[memberId]
+    const updated = { ...current }
+    if (currentSide === undefined) updated[memberId] = 'A'
+    else if (currentSide === 'A') updated[memberId] = 'B'
+    else delete updated[memberId]
+    setSavingTeams(true)
+    await roundService.updateTeamAssignments(round.roundId, updated as Record<string, 'A' | 'B'>)
+    setSavingTeams(false)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -98,6 +125,37 @@ export function RoundDetailPage() {
       </div>
 
       {error && <Alert message={error} />}
+
+      {/* Two Team assignment — creator only, pending only */}
+      {round.scoringFormat === 'two_team' && isCreator && round.status === 'pending' && round.memberIds?.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
+            Team Assignment
+          </h2>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl divide-y divide-gray-700">
+            {round.memberIds.map((mid) => {
+              const side = round.teamAssignments?.[mid]
+              return (
+                <div key={mid} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-white">{memberProfiles[mid]?.displayName ?? '…'}</span>
+                  <button
+                    onClick={() => handleTeamToggle(mid)}
+                    disabled={savingTeams}
+                    className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-colors ${
+                      side === 'A' ? 'border-green-500 bg-green-500/20 text-green-400'
+                      : side === 'B' ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                      : 'border-gray-600 bg-gray-700 text-gray-500'
+                    }`}
+                  >
+                    {side ?? '—'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">Tap to cycle: unassigned → A → B</p>
+        </div>
+      )}
 
       {/* Groups */}
       <div>

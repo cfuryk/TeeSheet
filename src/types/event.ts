@@ -27,8 +27,4 @@ export interface EventFormData {
   date: string
   endDate?: string
   isPrivate: boolean
-  // For single_round auto-round creation
-  courseId?: string
-  teeId?: string
-  roundType?: 'STROKE_GROSS' | 'STROKE_NET' | 'BEST_BALL_GROSS' | 'BEST_BALL_NET'
 }

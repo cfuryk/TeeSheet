@@ -31,8 +31,14 @@ export function roundTypeLabel(type: string): string {
   const labels: Record<string, string> = {
     STROKE_GROSS: 'Stroke (Gross)',
     STROKE_NET: 'Stroke (Net)',
-    BEST_BALL_GROSS: 'Best Ball (Gross)',
-    BEST_BALL_NET: 'Best Ball (Net)',
+    BEST_BALL_GROSS: '2-Man Best Ball (Gross)',
+    BEST_BALL_NET: '2-Man Best Ball (Net)',
+    TWO_TEAM_STROKE_GROSS: 'Two Team Stroke (Gross)',
+    TWO_TEAM_STROKE_NET: 'Two Team Stroke (Net)',
+    TWO_TEAM_BB_MATCH_GROSS: 'Two Team BB Match (Gross)',
+    TWO_TEAM_BB_MATCH_NET: 'Two Team BB Match (Net)',
+    TWO_TEAM_BB_STROKE_GROSS: 'Two Team BB Stroke (Gross)',
+    TWO_TEAM_BB_STROKE_NET: 'Two Team BB Stroke (Net)',
   }
   return labels[type] ?? type
 }

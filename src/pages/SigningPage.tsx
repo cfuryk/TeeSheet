@@ -76,6 +76,8 @@ export function SigningPage() {
           scores={scores}
           holes={tee.holes}
           currentUserId={uid}
+          roundId={roundId!}
+          groupId={groupId!}
           onSign={handleSign}
           signing={signing}
         />

@@ -1,24 +1,41 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { inviteService } from '@/services/inviteService'
 import { loginSchema, LoginFormData } from '@/schemas/userSchemas'
 import { Input, Button, Alert } from '@/components/ui'
 
 export function LoginPage() {
   const { signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const inviteToken = (location.state as { inviteToken?: string } | null)?.inviteToken
   const [error, setError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   })
 
+  async function afterAuth(uid: string) {
+    if (inviteToken) {
+      const result = await inviteService.fulfillInvite(inviteToken, uid)
+      if (result) {
+        const path = result.targetType === 'event'
+          ? `/events/${result.targetId}`
+          : `/rounds/${result.targetId}`
+        navigate(path, { replace: true })
+        return
+      }
+    }
+    navigate('/')
+  }
+
   async function onSubmit(data: LoginFormData) {
     try {
       setError('')
-      await signIn(data.email, data.password)
-      navigate('/')
+      const cred = await signIn(data.email, data.password)
+      await afterAuth(cred.user.uid)
     } catch {
       setError('Invalid email or password')
     }
@@ -27,8 +44,8 @@ export function LoginPage() {
   async function handleGoogle() {
     try {
       setError('')
-      await signInWithGoogle()
-      navigate('/')
+      const cred = await signInWithGoogle()
+      await afterAuth(cred.user.uid)
     } catch {
       setError('Google sign-in failed')
     }

@@ -18,8 +18,8 @@ interface AuthContextValue {
   userProfile: UserProfile | null
   loading: boolean
   register: (email: string, password: string, displayName: string) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
-  signInWithGoogle: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<{ user: User }>
+  signInWithGoogle: () => Promise<{ user: User }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
 }
@@ -63,11 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password)
+    return signInWithEmailAndPassword(auth, email, password)
   }
 
   async function signInWithGoogle() {
-    const { user } = await signInWithPopup(auth, googleProvider)
+    const cred = await signInWithPopup(auth, googleProvider)
+    const { user } = cred
     const existing = await userService.getProfile(user.uid)
     if (!existing) {
       await userService.createProfile(user.uid, {
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const profile = await userService.getProfile(user.uid)
       setUserProfile(profile)
     }
+    return cred
   }
 
   async function signOut() {

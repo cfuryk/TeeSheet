@@ -20,9 +20,9 @@ export function TeeSheetPage() {
 
   if (!currentUser) {
     return (
-      <div className="flex flex-col items-center justify-center gap-6 py-16">
-        <h1 className="text-2xl font-black text-white text-center">Welcome to the Teesheet</h1>
-        <div className="flex gap-3 w-full">
+      <div className="flex flex-col items-center justify-center gap-6 py-16 relative overflow-hidden">
+        <h1 className="text-2xl font-black text-white text-center relative z-10">Welcome to the Teesheet</h1>
+        <div className="flex gap-3 w-full relative z-10">
           <Link
             to="/register"
             className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
@@ -31,11 +31,17 @@ export function TeeSheetPage() {
           </Link>
           <Link
             to="/login"
-            className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-center py-3 rounded-xl font-semibold transition-colors border border-gray-700"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
           >
             Sign In
           </Link>
         </div>
+        <img
+          src="/src/images/Icon.svg"
+          alt=""
+          aria-hidden="true"
+          className="w-[360px] opacity-20 pointer-events-none select-none"
+        />
       </div>
     )
   }

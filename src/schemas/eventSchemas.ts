@@ -7,7 +7,4 @@ export const eventFormSchema = z.object({
   date: z.string().min(1, 'Select a date'),
   endDate: z.string().optional(),
   isPrivate: z.boolean(),
-  courseId: z.string().optional(),
-  teeId: z.string().optional(),
-  roundType: z.enum(['STROKE_GROSS', 'STROKE_NET', 'BEST_BALL_GROSS', 'BEST_BALL_NET']).optional(),
 })

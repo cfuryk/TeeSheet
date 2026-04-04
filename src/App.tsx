@@ -29,6 +29,7 @@ import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
 import { AdminRoundsPage } from '@/pages/admin/AdminRoundsPage'
 import { AdminEventsPage } from '@/pages/admin/AdminEventsPage'
 import { AdminScoresPage } from '@/pages/admin/AdminScoresPage'
+import { InvitePage } from '@/pages/InvitePage'
 
 export default function App() {
   return (
@@ -76,6 +77,8 @@ export default function App() {
             <Route path="/admin/rounds" element={<ProtectedRoute requireAdmin><AdminRoundsPage /></ProtectedRoute>} />
             <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
             <Route path="/admin/scores" element={<ProtectedRoute requireAdmin><AdminScoresPage /></ProtectedRoute>} />
+
+            <Route path="/invite/:token" element={<InvitePage />} />
           </Route>
 
           {/* Fallback */}

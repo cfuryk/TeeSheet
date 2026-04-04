@@ -1,11 +1,21 @@
 import { Timestamp } from 'firebase/firestore'
 import type { Score } from './group'
 
+export type ScoringFormat = 'individual' | 'two_team'
+
 export type RoundType =
+  // Individual
   | 'STROKE_GROSS'
   | 'STROKE_NET'
   | 'BEST_BALL_GROSS'
   | 'BEST_BALL_NET'
+  // Two Team
+  | 'TWO_TEAM_STROKE_GROSS'
+  | 'TWO_TEAM_STROKE_NET'
+  | 'TWO_TEAM_BB_MATCH_GROSS'
+  | 'TWO_TEAM_BB_MATCH_NET'
+  | 'TWO_TEAM_BB_STROKE_GROSS'
+  | 'TWO_TEAM_BB_STROKE_NET'
 
 export type RoundStatus = 'pending' | 'active' | 'completed'
 
@@ -31,6 +41,7 @@ export interface Round {
   teeId: string
   teeName: string
   date: Timestamp
+  scoringFormat: ScoringFormat
   roundType: RoundType
   isPrivate: boolean
   createdBy: string
@@ -38,6 +49,8 @@ export interface Round {
   eventId: string | null
   groupIds: string[]
   memberIds: string[]
+  /** For two_team rounds: maps uid -> 'A' | 'B' */
+  teamAssignments: Record<string, 'A' | 'B'> | null
   simpleGrossScore?: number
   /** @deprecated moved to Group */
   golferIds?: string[]
@@ -52,6 +65,7 @@ export interface RoundFormData {
   courseId: string
   teeId: string
   date: string
+  scoringFormat: ScoringFormat
   roundType: RoundType
   isPrivate: boolean
   eventId?: string

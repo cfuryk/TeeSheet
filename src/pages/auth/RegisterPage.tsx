@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { inviteService } from '@/services/inviteService'
 import { registerSchema, RegisterFormData } from '@/schemas/userSchemas'
 import { Input, Button, Alert } from '@/components/ui'
 
 export function RegisterPage() {
   const { register: registerUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const inviteToken = (location.state as { inviteToken?: string } | null)?.inviteToken
   const [error, setError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -18,6 +21,21 @@ export function RegisterPage() {
     try {
       setError('')
       await registerUser(data.email, data.password, data.displayName)
+      if (inviteToken) {
+        // currentUser is set by AuthContext after registerUser — get uid from Firebase directly
+        const { getAuth } = await import('firebase/auth')
+        const uid = getAuth().currentUser?.uid
+        if (uid) {
+          const result = await inviteService.fulfillInvite(inviteToken, uid)
+          if (result) {
+            const path = result.targetType === 'event'
+              ? `/events/${result.targetId}`
+              : `/rounds/${result.targetId}`
+            navigate(path, { replace: true })
+            return
+          }
+        }
+      }
       navigate('/')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Registration failed'

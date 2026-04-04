@@ -49,6 +49,7 @@ export const roundService = {
       teeId: data.teeId,
       teeName,
       date: Timestamp.fromDate(localDateFromString(data.date)),
+      scoringFormat: data.scoringFormat,
       roundType: data.roundType,
       isPrivate: data.isPrivate,
       createdBy,
@@ -56,6 +57,7 @@ export const roundService = {
       eventId,
       groupIds: [],
       memberIds: [],
+      teamAssignments: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
@@ -145,6 +147,16 @@ export const roundService = {
     return onSnapshot(q, (snap) => {
       const rounds = snap.docs.map((d) => ({ roundId: d.id, ...d.data() }) as Round)
       callback(autoCloseStale(rounds))
+    })
+  },
+
+  async updateTeamAssignments(
+    roundId: string,
+    assignments: Record<string, 'A' | 'B'>,
+  ): Promise<void> {
+    await updateDoc(doc(db, 'rounds', roundId), {
+      teamAssignments: assignments,
+      updatedAt: serverTimestamp(),
     })
   },
 }

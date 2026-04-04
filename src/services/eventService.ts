@@ -26,8 +26,8 @@ export const eventService = {
       createdBy,
       status: 'upcoming' as EventStatus,
       roundIds: [],
-      memberIds: [],
-      handicaps: {},
+      memberIds: [createdBy],
+      handicaps: { [createdBy]: 0 },
       isPrivate: data.isPrivate,
       date: Timestamp.fromDate(localDateFromString(data.date)),
       endDate: data.endDate ? Timestamp.fromDate(localDateFromString(data.endDate)) : null,
@@ -97,6 +97,17 @@ export const eventService = {
     const q = query(
       collection(db, 'events'),
       where('createdBy', '==', createdBy),
+      orderBy('date', 'desc'),
+    )
+    return onSnapshot(q, (snap) => {
+      callback(snap.docs.map((d) => ({ eventId: d.id, ...d.data() }) as GolfEvent))
+    })
+  },
+
+  onMemberEventsSnapshot(uid: string, callback: (events: GolfEvent[]) => void): () => void {
+    const q = query(
+      collection(db, 'events'),
+      where('memberIds', 'array-contains', uid),
       orderBy('date', 'desc'),
     )
     return onSnapshot(q, (snap) => {
