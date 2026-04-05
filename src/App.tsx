@@ -22,6 +22,7 @@ import { EventDetailPage } from '@/pages/EventDetailPage'
 import { MyRoundsPage } from '@/pages/MyRoundsPage'
 import { MyScoresPage } from '@/pages/MyScoresPage'
 import { MyEventsPage } from '@/pages/MyEventsPage'
+import { MyBetsPage } from '@/pages/MyBetsPage'
 import { CourseListPage } from '@/pages/CourseListPage'
 import { CourseDetailPage } from '@/pages/CourseDetailPage'
 import { ProfilePage } from '@/pages/ProfilePage'
@@ -30,7 +31,10 @@ import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
 import { AdminRoundsPage } from '@/pages/admin/AdminRoundsPage'
 import { AdminEventsPage } from '@/pages/admin/AdminEventsPage'
 import { AdminScoresPage } from '@/pages/admin/AdminScoresPage'
+import { AdminBetsPage } from '@/pages/admin/AdminBetsPage'
 import { InvitePage } from '@/pages/InvitePage'
+import { SideBetsPage } from '@/pages/SideBetsPage'
+import { SideBetDetailPage } from '@/pages/SideBetDetailPage'
 
 export default function App() {
   return (
@@ -58,6 +62,8 @@ export default function App() {
             <Route path="/rounds/:roundId/groups/:groupId/sign" element={<ProtectedRoute><SigningPage /></ProtectedRoute>} />
             <Route path="/rounds/:roundId/summary" element={<ProtectedRoute><RoundSummaryPage /></ProtectedRoute>} />
             <Route path="/rounds/:roundId/scorecard/:golferId" element={<ProtectedRoute><PlayerScorecardPage /></ProtectedRoute>} />
+            <Route path="/rounds/:roundId/side-bets" element={<ProtectedRoute><SideBetsPage /></ProtectedRoute>} />
+            <Route path="/rounds/:roundId/side-bets/:sideBetId" element={<ProtectedRoute><SideBetDetailPage /></ProtectedRoute>} />
 
             {/* Redirect old lobby URL */}
             <Route path="/rounds/:roundId/lobby" element={<Navigate to=".." relative="path" replace />} />
@@ -68,6 +74,7 @@ export default function App() {
             <Route path="/my-rounds" element={<ProtectedRoute><MyRoundsPage /></ProtectedRoute>} />
             <Route path="/my-scores" element={<ProtectedRoute><MyScoresPage /></ProtectedRoute>} />
             <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
+            <Route path="/my-bets" element={<ProtectedRoute><MyBetsPage /></ProtectedRoute>} />
 
             <Route path="/courses" element={<ProtectedRoute><CourseListPage /></ProtectedRoute>} />
             <Route path="/courses/new" element={<ProtectedRoute><CourseDetailPage /></ProtectedRoute>} />
@@ -79,6 +86,7 @@ export default function App() {
             <Route path="/admin/rounds" element={<ProtectedRoute requireAdmin><AdminRoundsPage /></ProtectedRoute>} />
             <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
             <Route path="/admin/scores" element={<ProtectedRoute requireAdmin><AdminScoresPage /></ProtectedRoute>} />
+            <Route path="/admin/bets" element={<ProtectedRoute requireAdmin><AdminBetsPage /></ProtectedRoute>} />
 
             <Route path="/invite/:token" element={<InvitePage />} />
           </Route>

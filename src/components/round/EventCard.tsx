@@ -30,7 +30,7 @@ export function EventCard({ event, currentUserId: _currentUserId }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{formatDate(event.date)}</span>
           <Badge label={event.type === 'single_round' ? 'Single Round' : 'Multi Round'} variant="gray" />
-          {event.isPrivate && <Badge label="Private" variant="blue" />}
+          {event.isPrivate && <Badge label="Private" variant="purple" />}
         </div>
       </Card>
     </Link>

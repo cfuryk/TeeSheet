@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useRound } from '@/hooks/useRound'
 import { useGroups } from '@/hooks/useGroup'
 import { courseService } from '@/services/courseService'
@@ -11,6 +11,9 @@ import type { Score, Tee } from '@/types'
 export function PlayerScorecardPage() {
   const { roundId, golferId } = useParams<{ roundId: string; golferId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const from = searchParams.get('from')
+  const groupId = searchParams.get('groupId')
   const { round, loading: roundLoading } = useRound(roundId!)
   const { groups, loading: groupsLoading } = useGroups(roundId!)
   const [score, setScore] = useState<Score | null>(null)
@@ -71,10 +74,21 @@ export function PlayerScorecardPage() {
     ? `${score.golferName} / ${partnerScore.golferName}`
     : score.golferName
 
+  const backLabel = from === 'scorecard' ? 'Back to Scorecard' : 'Back to Leaderboard'
+  function handleBack() {
+    if (from === 'scorecard' && groupId) {
+      navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
+    } else if (from === 'scorecard') {
+      navigate(-1)
+    } else {
+      navigate(`/rounds/${roundId}/summary`)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <Button onClick={() => navigate(`/rounds/${roundId}/summary`)}>
-        Back to Leaderboard
+      <Button onClick={handleBack}>
+        {backLabel}
       </Button>
       <h1 className="text-xl font-bold text-white">{title}</h1>
       <ScorecardGrid scores={displayScores} holes={tee.holes} isNet={useNet} showBestBall={isBestBall && !!partnerScore} />

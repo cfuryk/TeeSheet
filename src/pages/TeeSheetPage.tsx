@@ -51,12 +51,6 @@ export function TeeSheetPage() {
       {/* CTAs */}
       <div className="flex gap-3">
         <Link
-          to="/events/new"
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
-        >
-          + Create Event
-        </Link>
-        <Link
           to="/rounds/new"
           className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
         >
@@ -79,7 +73,7 @@ export function TeeSheetPage() {
             <EventCard key={e.eventId} event={e} currentUserId={uid} />
           ))}
           {rounds.map((r) => (
-            <RoundCard key={r.roundId} round={r} currentUserId={uid} />
+            <RoundCard key={r.roundId} round={r} currentUserId={uid} showStatus />
           ))}
         </div>
       )}

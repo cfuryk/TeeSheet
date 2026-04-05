@@ -41,6 +41,7 @@ export function EditRoundPage() {
       date: round.date.toDate().toISOString().slice(0, 10),
       roundType: round.roundType,
       isPrivate: round.isPrivate,
+      wager: round.wager ?? undefined,
     })
   }, [round, reset])
 
@@ -63,6 +64,7 @@ export function EditRoundPage() {
         date: Timestamp.fromDate(localDateFromString(data.date)),
         roundType: data.roundType,
         isPrivate: data.isPrivate,
+        wager: data.wager && data.wager > 0 ? data.wager : undefined,
       })
       navigate(`/rounds/${round.roundId}`)
     } catch {
@@ -133,6 +135,21 @@ export function EditRoundPage() {
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-300">Wager per Person (optional)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                {...register('wager')}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-7 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p className="text-xs text-gray-500">Each player antes in. Winner(s) split the pot.</p>
+          </div>
           <div className="flex gap-2 mt-2">
             <Button type="submit" loading={isSubmitting} className="flex-1">
               Save Changes

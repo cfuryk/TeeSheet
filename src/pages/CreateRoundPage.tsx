@@ -133,6 +133,7 @@ export function CreateRoundPage() {
 
       {error && <Alert message={error} />}
 
+
       {/* Scoring Format Info Modal */}
       {showFormatInfo && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4">
@@ -297,6 +298,23 @@ export function CreateRoundPage() {
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>
+
+          {/* Wager */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-300">Wager per Person (optional)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                {...register('wager')}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-7 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p className="text-xs text-gray-500">Each player antes in. Winner(s) split the pot.</p>
+          </div>
 
           <Button type="submit" loading={isSubmitting} className="w-full mt-2">
             Create Round

@@ -20,6 +20,7 @@ export const roundFormSchema = z.object({
     'SCRAMBLE_GROSS',
   ]),
   isPrivate: z.boolean(),
+  wager: z.coerce.number().min(0).optional(),
 })
 
 export type RoundFormValues = z.infer<typeof roundFormSchema>

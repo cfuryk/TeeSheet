@@ -13,7 +13,10 @@
       "mcp__ide__getDiagnostics",
       "Bash(xargs grep:*)",
       "Bash(npx tsc:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(node scripts/seed.mjs --clean)",
+      "Bash(node scripts/seed.mjs)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useRound } from '@/hooks/useRound'
 import { useGroups } from '@/hooks/useGroup'
 import { courseService } from '@/services/courseService'
@@ -20,6 +20,9 @@ import {
 export function RoundSummaryPage() {
   const { roundId } = useParams<{ roundId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const from = searchParams.get('from')
+  const groupId = searchParams.get('groupId')
   const { round, loading: roundLoading } = useRound(roundId!)
   const { groups, loading: groupsLoading } = useGroups(roundId!)
   const [allScores, setAllScores] = useState<Score[]>([])
@@ -60,12 +63,16 @@ export function RoundSummaryPage() {
         : <IndividualLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
       }
 
-      <Link
-        to={`/rounds/${roundId}`}
+      <button
+        type="button"
+        onClick={() => {
+          if (from === 'scorecard' && groupId) navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
+          else navigate(`/rounds/${roundId}`)
+        }}
         className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors"
       >
-        Back to Round
-      </Link>
+        {from === 'scorecard' ? 'Back to Scorecard' : 'Back to Round'}
+      </button>
     </div>
   )
 }
@@ -136,7 +143,11 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
       <h3 className="font-semibold text-gray-400 mb-3">Leaderboard</h3>
       <div className="flex flex-col gap-2">
         {leaderboard.map((sc, i) => {
-          const total = useNet ? sc.totalNet : sc.totalGross
+          const holesPlayed = sc.scores.length
+          const finished = holesPlayed === 18
+          const gross = sc.scores.reduce((s, h) => s + h.grossScore, 0)
+          const net = sc.scores.reduce((s, h) => s + h.netScore, 0)
+          const displayScore = holesPlayed > 0 ? (useNet ? net : gross) : null
           const vsPar = useNet
             ? calculateTotalNetVsPar(sc.scores, tee.holes)
             : calculateTotalVsPar(sc.scores, tee.holes)
@@ -151,10 +162,7 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
                 <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
                 <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{sc.golferName}</span>
               </span>
-              <span className="flex items-center shrink-0 ml-3">
-                <span className="font-mono w-8 text-right text-white">{total ?? '-'}</span>
-                <span className="font-mono w-14 text-right text-sm text-gray-400">({formatVsPar(vsPar)})</span>
-              </span>
+              <ScoreStatus holesPlayed={holesPlayed} finished={finished} score={displayScore} vsPar={vsPar} />
             </button>
           )
         })}
@@ -186,7 +194,10 @@ function ScrambleLeaderboard({ groups, allScores, tee, roundId, navigate }: {
     <Card className="p-4">
       <h3 className="font-semibold text-gray-400 mb-3">Scramble Leaderboard</h3>
       <div className="flex flex-col gap-2">
-        {rows.map((row, i) => (
+        {rows.map((row, i) => {
+          const adminScore = allScores.find((s) => s.golferId === row.adminId)
+          const holesPlayed = adminScore?.scores.length ?? 0
+          return (
           <button
             key={row.group.groupId}
             type="button"
@@ -197,12 +208,10 @@ function ScrambleLeaderboard({ groups, allScores, tee, roundId, navigate }: {
               <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
               <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{row.group.name ?? `Group ${i + 1}`}</span>
             </span>
-            <span className="flex items-center shrink-0 ml-3">
-              <span className="font-mono w-8 text-right text-white">{row.total ?? '-'}</span>
-              <span className="font-mono w-14 text-right text-sm text-gray-400">{row.vsPar !== null ? `(${formatVsPar(row.vsPar)})` : ''}</span>
-            </span>
+            <ScoreStatus holesPlayed={holesPlayed} finished={holesPlayed === 18} score={row.total} vsPar={row.vsPar ?? 0} />
           </button>
-        ))}
+          )
+        })}
       </div>
     </Card>
   )
@@ -296,10 +305,6 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
             {scores
               .sort((a, b) => ((useNet ? a.totalNet : a.totalGross) ?? 999) - ((useNet ? b.totalNet : b.totalGross) ?? 999))
               .map((sc, i) => {
-                const total = useNet ? sc.totalNet : sc.totalGross
-                const vsPar = useNet
-                  ? calculateTotalNetVsPar(sc.scores, tee.holes)
-                  : calculateTotalVsPar(sc.scores, tee.holes)
                 return (
                   <button
                     key={sc.golferId}
@@ -311,10 +316,12 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
                       <span className="text-sm text-white w-5 shrink-0">{i + 1}.</span>
                       <span className="text-white truncate">{sc.golferName}</span>
                     </span>
-                    <span className="flex items-center shrink-0 ml-3">
-                      <span className="font-mono w-8 text-right text-white">{total ?? '-'}</span>
-                      <span className="font-mono w-14 text-right text-sm text-gray-400">({formatVsPar(vsPar)})</span>
-                    </span>
+                    <ScoreStatus
+                      holesPlayed={sc.scores.length}
+                      finished={sc.scores.length === 18}
+                      score={sc.scores.length > 0 ? (useNet ? sc.scores.reduce((s, h) => s + h.netScore, 0) : sc.scores.reduce((s, h) => s + h.grossScore, 0)) : null}
+                      vsPar={useNet ? calculateTotalNetVsPar(sc.scores, tee.holes) : calculateTotalVsPar(sc.scores, tee.holes)}
+                    />
                   </button>
                 )
               })}
@@ -349,5 +356,24 @@ function TeamScoreTile({ label, score, avg, points, winner }: {
         </>
       )}
     </div>
+  )
+}
+
+function ScoreStatus({ holesPlayed, finished, score, vsPar }: {
+  holesPlayed: number
+  finished: boolean
+  score: number | null
+  vsPar: number
+}) {
+  const holeLabel = finished ? 'F' : `${holesPlayed}`
+  const vsParColor = vsPar < 0 ? 'text-red-400' : vsPar > 0 ? 'text-blue-400' : 'text-gray-400'
+  return (
+    <span className="flex items-center gap-1 shrink-0 ml-3 font-mono text-sm">
+      <span className="text-gray-500">{holeLabel}</span>
+      <span className="text-gray-600">|</span>
+      <span className="text-white">{score ?? '-'}</span>
+      <span className="text-gray-600">|</span>
+      <span className={vsParColor}>{formatVsPar(vsPar)}</span>
+    </span>
   )
 }

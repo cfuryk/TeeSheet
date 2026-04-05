@@ -208,6 +208,163 @@ async function ensureSeedCourse() {
   return { courseId: courseRef.id, teeId }
 }
 
+// ─── Pending round writer (no scores, groups are pending) ────────────────────
+
+async function createPendingRound({
+  name,
+  scoringFormat,
+  roundType,
+  courseId,
+  teeId,
+  memberUids,   // flat list of all member UIDs who have joined
+  groups,       // array of { golfers: Golfer[] } — just the golfer lists, no scores
+}) {
+  const roundRef = await addDoc(collection(db, 'rounds'), {
+    name,
+    courseId,
+    courseName: 'Seed Golf Club',
+    teeId,
+    teeName: 'White',
+    date: Timestamp.fromDate(new Date()),  // today — pending rounds haven't happened yet
+    scoringFormat,
+    roundType,
+    isPrivate: false,
+    createdBy: CREATOR_UID,
+    status: 'pending',
+    eventId: null,
+    groupIds: [],
+    memberIds: memberUids,
+    teamAssignments: null,
+    __seeded: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+  })
+  await updateDoc(roundRef, { roundId: roundRef.id })
+  const roundId = roundRef.id
+
+  const allGroupIds = []
+  for (let gi = 0; gi < groups.length; gi++) {
+    const grp = groups[gi]
+    const groupRef = await addDoc(collection(db, 'rounds', roundId, 'groups'), {
+      roundId,
+      name: groups.length === 1 ? 'Group 1' : `Group ${gi + 1}`,
+      golferIds: grp.golfers.map((p) => p.uid),
+      teams: null,
+      status: 'pending',
+      groupAdminId: grp.golfers[0].uid,
+      __seeded: true,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await updateDoc(groupRef, { groupId: groupRef.id })
+    allGroupIds.push(groupRef.id)
+  }
+
+  await updateDoc(roundRef, { groupIds: allGroupIds })
+  console.log(`  ✓ ${name} (pending)`)
+  console.log(`    Detail:  /rounds/${roundId}`)
+  console.log(`    SideBets: /rounds/${roundId}/side-bets`)
+  return roundId
+}
+
+// ─── Side Bets writer ─────────────────────────────────────────────────────────
+
+async function seedSideBets(roundId, bets) {
+  for (const bet of bets) {
+    const ref = await addDoc(collection(db, 'rounds', roundId, 'sideBets'), {
+      ...bet,
+      roundId,
+      __seeded: true,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await updateDoc(ref, { sideBetId: ref.id })
+  }
+  console.log(`    + ${bets.length} side bets`)
+}
+
+// ─── Active round writer (in progress — partial scores, no sign-off) ─────────
+
+async function createActiveRound({
+  name,
+  scoringFormat,
+  roundType,
+  courseId,
+  teeId,
+  groups, // array of { golfers: Golfer[] }
+  holesPlayed = 9, // how many holes have been scored so far
+}) {
+  const memberIds = groups.flatMap((g) => g.golfers.map((p) => p.uid))
+  const roundRef = await addDoc(collection(db, 'rounds'), {
+    name,
+    courseId,
+    courseName: 'Seed Golf Club',
+    teeId,
+    teeName: 'White',
+    date: Timestamp.fromDate(new Date()),
+    scoringFormat,
+    roundType,
+    isPrivate: false,
+    createdBy: CREATOR_UID,
+    status: 'active',
+    eventId: null,
+    groupIds: [],
+    memberIds,
+    teamAssignments: null,
+    __seeded: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+  })
+  await updateDoc(roundRef, { roundId: roundRef.id })
+  const roundId = roundRef.id
+
+  const allGroupIds = []
+  for (let gi = 0; gi < groups.length; gi++) {
+    const grp = groups[gi]
+    const groupRef = await addDoc(collection(db, 'rounds', roundId, 'groups'), {
+      roundId,
+      name: groups.length === 1 ? 'Group 1' : `Group ${gi + 1}`,
+      golferIds: grp.golfers.map((p) => p.uid),
+      teams: null,
+      status: 'active',
+      groupAdminId: grp.golfers[0].uid,
+      __seeded: true,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await updateDoc(groupRef, { groupId: groupRef.id })
+    const groupId = groupRef.id
+    allGroupIds.push(groupId)
+
+    // Write partial scores (only holesPlayed holes scored)
+    for (const golfer of grp.golfers) {
+      const chp = courseHandicap(golfer.handicap)
+      const sa = strokeAllocation(chp)
+      const allScores = buildScores(golfer)
+      const partialScores = allScores.slice(0, holesPlayed)
+      await setDoc(doc(db, 'rounds', roundId, 'groups', groupId, 'scores', golfer.uid), {
+        golferId: golfer.uid,
+        golferName: golfer.name,
+        courseHandicap: chp,
+        strokeAllocation: sa,
+        scores: partialScores,
+        totalGross: totalGross(partialScores),
+        totalNet: totalNet(partialScores),
+        signedAt: null,
+        signedBy: null,
+        isLocked: false,
+        updatedAt: NOW,
+      })
+    }
+  }
+
+  await updateDoc(roundRef, { groupIds: allGroupIds })
+  console.log(`  ✓ ${name} (active, ${holesPlayed} holes played)`)
+  console.log(`    Detail:  /rounds/${roundId}`)
+  console.log(`    SideBets: /rounds/${roundId}/side-bets`)
+  return roundId
+}
+
 // ─── Round + Group + Scores writer ───────────────────────────────────────────
 
 async function createRound({
@@ -443,8 +600,296 @@ async function seedAll() {
     ],
   })
 
+  // ── Pending rounds (for testing Create Side Bet form) ────────────────────
+  console.log('\n🌱 Seeding pending rounds (for side bet testing)...')
+
+  await createPendingRound({
+    name: '[Seed] Pending - Stroke Gross (4 players)',
+    scoringFormat: 'individual',
+    roundType: 'STROKE_GROSS',
+    courseId, teeId,
+    memberUids: [CREATOR_UID, ethan.uid, fiona.uid, george.uid],
+    groups: [{ golfers: [{ uid: CREATOR_UID, name: 'Seed User', handicap: 10 }, ethan, fiona, george] }],
+  })
+
+  await createPendingRound({
+    name: '[Seed] Pending - Stroke Net (4 players)',
+    scoringFormat: 'individual',
+    roundType: 'STROKE_NET',
+    courseId, teeId,
+    memberUids: [CREATOR_UID, hannah.uid, ivan.uid, julia.uid],
+    groups: [{ golfers: [{ uid: CREATOR_UID, name: 'Seed User', handicap: 10 }, hannah, ivan, julia] }],
+  })
+
+  await createPendingRound({
+    name: '[Seed] Pending - Stroke Gross (8 players, 2 groups)',
+    scoringFormat: 'individual',
+    roundType: 'STROKE_GROSS',
+    courseId, teeId,
+    memberUids: [CREATOR_UID, alice.uid, bob.uid, carol.uid, david.uid, ethan.uid, fiona.uid, george.uid],
+    groups: [
+      { golfers: [{ uid: CREATOR_UID, name: 'Seed User', handicap: 10 }, alice, bob, carol] },
+      { golfers: [david, ethan, fiona, george] },
+    ],
+  })
+
+  // ── Active rounds (in progress) with side bets ────────────────────────────
+  console.log('\n⛳ Seeding active rounds (in progress)...')
+
+  const seedUser = { uid: CREATOR_UID, name: 'Seed User', handicap: 10 }
+
+  const activeRound1Id = await createActiveRound({
+    name: '[Seed] Active - Stroke Gross (front 9 done)',
+    scoringFormat: 'individual',
+    roundType: 'STROKE_GROSS',
+    courseId, teeId,
+    holesPlayed: 9,
+    groups: [{ golfers: [seedUser, kevin, laura, marcus] }],
+  })
+  await seedSideBets(activeRound1Id, [
+    // Seed User challenges Kevin and Laura — they're invited, not yet accepted
+    {
+      type: 'CHALLENGE_GROSS',
+      status: 'pending',
+      isPublic: false,
+      wagerPerPerson: 10,
+      createdBy: CREATOR_UID,
+      participantIds: [CREATOR_UID],
+      invitedIds: [kevin.uid, laura.uid],
+      declinedIds: [],
+      winnersIds: null,
+      settledAt: null,
+    },
+    // Seed User vs Kevin vs Marcus — all confirmed, active, gross
+    {
+      type: 'CHALLENGE_GROSS',
+      status: 'active',
+      isPublic: false,
+      wagerPerPerson: 5,
+      createdBy: CREATOR_UID,
+      participantIds: [CREATOR_UID, kevin.uid, marcus.uid],
+      invitedIds: [],
+      declinedIds: [],
+      winnersIds: null,
+      settledAt: null,
+    },
+    // Public bet — anyone can join, currently 2 participants
+    {
+      type: 'CHALLENGE_GROSS',
+      status: 'pending',
+      isPublic: true,
+      wagerPerPerson: 3,
+      createdBy: laura.uid,
+      participantIds: [laura.uid, marcus.uid],
+      invitedIds: [],
+      declinedIds: [],
+      winnersIds: null,
+      settledAt: null,
+    },
+  ])
+
+  const activeRound2Id = await createActiveRound({
+    name: '[Seed] Active - Stroke Net (hole 14)',
+    scoringFormat: 'individual',
+    roundType: 'STROKE_NET',
+    courseId, teeId,
+    holesPlayed: 13,
+    groups: [{ golfers: [seedUser, nina, omar, petra] }],
+  })
+  await seedSideBets(activeRound2Id, [
+    // Seed User vs Nina vs Omar — net bet, all active
+    {
+      type: 'CHALLENGE_NET',
+      status: 'active',
+      isPublic: false,
+      wagerPerPerson: 15,
+      createdBy: CREATOR_UID,
+      participantIds: [CREATOR_UID, nina.uid, omar.uid],
+      invitedIds: [],
+      declinedIds: [],
+      winnersIds: null,
+      settledAt: null,
+    },
+    // Omar challenges Petra — pending, she hasn't accepted
+    {
+      type: 'CHALLENGE_GROSS',
+      status: 'pending',
+      isPublic: false,
+      wagerPerPerson: 5,
+      createdBy: omar.uid,
+      participantIds: [omar.uid],
+      invitedIds: [petra.uid],
+      declinedIds: [],
+      winnersIds: null,
+      settledAt: null,
+    },
+  ])
+
+  // ── Side bets on completed rounds ─────────────────────────────────────────
+  console.log('\n🎲 Seeding side bets on completed rounds...')
+  const completedQ = query(
+    collection(db, 'rounds'),
+    where('__seeded', '==', true),
+    where('name', '==', '[Seed] Stroke - Gross'),
+  )
+  const completedSnap = await getDocs(completedQ)
+  if (!completedSnap.empty) {
+    const completedRoundId = completedSnap.docs[0].id
+    // Get first group in this round
+    const groupsSnap = await getDocs(collection(db, 'rounds', completedRoundId, 'groups'))
+    const firstGroupId = groupsSnap.docs[0].id
+    const scoreSnap = await getDocs(
+      collection(db, 'rounds', completedRoundId, 'groups', firstGroupId, 'scores')
+    )
+    // Determine winner from scores (lower gross)
+    const scoreDocs = scoreSnap.docs.map((d) => d.data())
+    const aliceScore = scoreDocs.find((s) => s.golferId === alice.uid)
+    const bobScore   = scoreDocs.find((s) => s.golferId === bob.uid)
+    const carolScore = scoreDocs.find((s) => s.golferId === carol.uid)
+    const davidScore = scoreDocs.find((s) => s.golferId === david.uid)
+
+    const aliceWinsVsBob = aliceScore && bobScore
+      ? aliceScore.totalGross <= bobScore.totalGross
+      : true
+
+    const teamAGross = (aliceScore?.totalGross ?? 0) + (carolScore?.totalGross ?? 0)
+    const teamBGross = (bobScore?.totalGross ?? 0) + (davidScore?.totalGross ?? 0)
+    const teamAWins = teamAGross <= teamBGross
+
+    await seedSideBets(completedRoundId, [
+      // Settled: Alice vs Bob vs Carol (3-way gross) — winner determined by scores
+      {
+        type: 'CHALLENGE_GROSS',
+        status: 'settled',
+        isPublic: false,
+        wagerPerPerson: 5,
+        createdBy: alice.uid,
+        participantIds: [alice.uid, bob.uid, carol.uid],
+        invitedIds: [],
+        declinedIds: [],
+        winnersIds: aliceWinsVsBob ? [alice.uid] : [bob.uid],
+        settledAt: NOW,
+      },
+      // Settled: All 4 players — team gross, each loser pays each winner
+      {
+        type: 'CHALLENGE_TEAM_GROSS',
+        status: 'settled',
+        isPublic: false,
+        wagerPerPerson: 10,
+        createdBy: alice.uid,
+        participantIds: [alice.uid, carol.uid, bob.uid, david.uid],
+        invitedIds: [],
+        declinedIds: [],
+        winnersIds: teamAWins ? [alice.uid, carol.uid] : [bob.uid, david.uid],
+        settledAt: NOW,
+      },
+      // Active: Carol vs David (waiting to settle — round is completed but bet still active)
+      {
+        type: 'CHALLENGE_GROSS',
+        status: 'active',
+        isPublic: false,
+        wagerPerPerson: 2,
+        createdBy: carol.uid,
+        participantIds: [carol.uid, david.uid],
+        invitedIds: [],
+        declinedIds: [],
+        winnersIds: null,
+        settledAt: null,
+      },
+      // Pending: Carol challenges Bob, Bob hasn't responded
+      {
+        type: 'CHALLENGE_NET',
+        status: 'pending',
+        isPublic: false,
+        wagerPerPerson: 5,
+        createdBy: carol.uid,
+        participantIds: [carol.uid],
+        invitedIds: [bob.uid],
+        declinedIds: [],
+        winnersIds: null,
+        settledAt: null,
+      },
+    ])
+    console.log(`  ✓ Added side bets to [Seed] Stroke - Gross (${completedRoundId})`)
+  } else {
+    console.log('  ⚠ Could not find [Seed] Stroke - Gross round for side bets')
+  }
+
+  // Side bets on [Seed] Stroke - Net (net challenge types)
+  const netQ = query(
+    collection(db, 'rounds'),
+    where('__seeded', '==', true),
+    where('name', '==', '[Seed] Stroke - Net'),
+  )
+  const netSnap = await getDocs(netQ)
+  if (!netSnap.empty) {
+    const netRoundId = netSnap.docs[0].id
+    const netGroupsSnap = await getDocs(collection(db, 'rounds', netRoundId, 'groups'))
+    const netFirstGroupId = netGroupsSnap.docs[0].id
+    const netScoreSnap = await getDocs(
+      collection(db, 'rounds', netRoundId, 'groups', netFirstGroupId, 'scores')
+    )
+    const netScoreDocs = netScoreSnap.docs.map((d) => d.data())
+    const aliceNet = netScoreDocs.find((s) => s.golferId === alice.uid)
+    const carolNet = netScoreDocs.find((s) => s.golferId === carol.uid)
+    const bobNet   = netScoreDocs.find((s) => s.golferId === bob.uid)
+    const davidNet = netScoreDocs.find((s) => s.golferId === david.uid)
+
+    const aliceBeatsCarol = (aliceNet?.totalNet ?? 99) <= (carolNet?.totalNet ?? 99)
+    const acTeamNet = (aliceNet?.totalNet ?? 0) + (carolNet?.totalNet ?? 0)
+    const bdTeamNet = (bobNet?.totalNet ?? 0) + (davidNet?.totalNet ?? 0)
+    const acTeamWins = acTeamNet <= bdTeamNet
+
+    await seedSideBets(netRoundId, [
+      // Settled: Alice vs Carol vs Bob (3-way net)
+      {
+        type: 'CHALLENGE_NET',
+        status: 'settled',
+        isPublic: false,
+        wagerPerPerson: 8,
+        createdBy: alice.uid,
+        participantIds: [alice.uid, carol.uid, bob.uid],
+        invitedIds: [],
+        declinedIds: [],
+        winnersIds: aliceBeatsCarol ? [alice.uid] : [carol.uid],
+        settledAt: NOW,
+      },
+      // Settled: All 4 players team net
+      {
+        type: 'CHALLENGE_TEAM_NET',
+        status: 'settled',
+        isPublic: false,
+        wagerPerPerson: 15,
+        createdBy: alice.uid,
+        participantIds: [alice.uid, carol.uid, bob.uid, david.uid],
+        invitedIds: [],
+        declinedIds: [],
+        winnersIds: acTeamWins ? [alice.uid, carol.uid] : [bob.uid, david.uid],
+        settledAt: NOW,
+      },
+      // Settled tie: Bob vs David (net) — same net score forced to tie
+      {
+        type: 'CHALLENGE_NET',
+        status: 'settled',
+        isPublic: false,
+        wagerPerPerson: 3,
+        createdBy: bob.uid,
+        participantIds: [bob.uid, david.uid],
+        invitedIds: [],
+        declinedIds: [],
+        winnersIds: [],  // tie
+        settledAt: NOW,
+      },
+    ])
+    console.log(`  ✓ Added side bets to [Seed] Stroke - Net (${netRoundId})`)
+  } else {
+    console.log('  ⚠ Could not find [Seed] Stroke - Net round for side bets')
+  }
+
   console.log('\n✅ All rounds seeded. Open the app and look for "[Seed]" rounds.')
-  console.log('   Navigate to any round → its detail page → View Summary to test the leaderboard.')
+  console.log('   Pending rounds → Side Bets to test the create form.')
+  console.log('   Active rounds  → Side Bets to see in-progress bets.')
+  console.log('   [Seed] Stroke - Gross / Net → Side Bets to see settled bets.')
 }
 
 // ─── Clean up all seeded data ─────────────────────────────────────────────────
@@ -466,6 +911,9 @@ async function cleanAll() {
       for (const scoreDoc of scoresSnap.docs) await deleteDoc(scoreDoc.ref)
       await deleteDoc(groupDoc.ref)
     }
+    // Delete sideBets subcollection
+    const sideBetsSnap = await getDocs(collection(db, 'rounds', roundId, 'sideBets'))
+    for (const sbDoc of sideBetsSnap.docs) await deleteDoc(sbDoc.ref)
     await deleteDoc(roundDoc.ref)
     console.log(`  ✓ Deleted round ${roundId}`)
   }

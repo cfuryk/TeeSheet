@@ -6,6 +6,7 @@ const workspaces = [
   { label: 'Rounds', description: 'View and manage all active and pending rounds', path: '/admin/rounds' },
   { label: 'Events', description: 'View and manage all events', path: '/admin/events' },
   { label: 'Scores', description: 'Search, view, and edit all golfer scores', path: '/admin/scores' },
+  { label: 'Bets', description: 'View and monitor all side bets across all rounds', path: '/admin/bets' },
 ]
 
 export function AdminPage() {

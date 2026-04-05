@@ -86,7 +86,7 @@ export function EventDetailPage() {
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           <span className="text-xs text-gray-500">{formatDate(event.date)}</span>
           <Badge label={event.type === 'single_round' ? 'Single Round' : 'Multi Round'} variant="gray" />
-          {event.isPrivate && <Badge label="Private" variant="blue" />}
+          {event.isPrivate && <Badge label="Private" variant="purple" />}
         </div>
       </div>
 
@@ -113,7 +113,7 @@ export function EventDetailPage() {
         {isCreator && (
           <Link
             to="/rounds/new"
-            className="mt-3 flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors text-sm"
+            className="mt-3 flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors text-base"
           >
             + Add Round
           </Link>
@@ -143,7 +143,7 @@ export function EventDetailPage() {
       {isCreator && (
         <button
           onClick={() => setShowInvite(true)}
-          className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors text-sm"
+          className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors text-base"
         >
           + Invite Participants
         </button>

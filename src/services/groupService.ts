@@ -18,6 +18,8 @@ import { userService } from './userService'
 import { roundService } from './roundService'
 import { calculateCourseHandicap, buildStrokeAllocation } from '@/lib/handicap'
 import { golferScoreService } from './golferScoreService'
+import { sideBetService } from './sideBetService'
+import { notificationService } from './notificationService'
 
 function groupsPath(roundId: string) {
   return collection(db, 'rounds', roundId, 'groups')
@@ -51,7 +53,7 @@ export const groupService = {
     return ref.id
   },
 
-  async addGolferToGroup(roundId: string, groupId: string, golferId: string): Promise<void> {
+  async addGolferToGroup(roundId: string, groupId: string, golferId: string, roundName?: string): Promise<void> {
     const batch = writeBatch(db)
     batch.update(groupDocPath(roundId, groupId), {
       golferIds: arrayUnion(golferId),
@@ -64,6 +66,12 @@ export const groupService = {
     await batch.commit()
     // Track on user profile for My Rounds queries
     await userService.addParticipantRoundId(golferId, roundId)
+    void notificationService.createNotification(golferId, {
+      type: 'round_invite',
+      title: 'You were added to a round',
+      body: roundName ?? 'A round',
+      roundId,
+    })
   },
 
   async getGroup(roundId: string, groupId: string): Promise<Group | null> {
@@ -104,6 +112,21 @@ export const groupService = {
     })
     batch.update(groupDocPath(roundId, toGroupId), {
       golferIds: arrayUnion(golferId),
+      updatedAt: serverTimestamp(),
+    })
+    await batch.commit()
+  },
+
+  async abandonGroup(roundId: string, groupId: string, golferId: string): Promise<void> {
+    // Delete only this golfer's score doc and reset the group to pending
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'rounds', roundId, 'groups', groupId, 'scores', golferId))
+    batch.update(groupDocPath(roundId, groupId), {
+      status: 'pending' as GroupStatus,
+      updatedAt: serverTimestamp(),
+    })
+    batch.update(doc(db, 'rounds', roundId), {
+      status: 'pending',
       updatedAt: serverTimestamp(),
     })
     await batch.commit()
@@ -284,6 +307,16 @@ export const groupService = {
             }
           }
         }
+        // Settle any active/pending side bets
+        const allGroupScoreSnaps = await Promise.all(
+          round.groupIds.map((gid) =>
+            getDocs(collection(db, 'rounds', roundId, 'groups', gid, 'scores'))
+          )
+        )
+        const allFlatScores = allGroupScoreSnaps.flatMap((snap) =>
+          snap.docs.map((d) => d.data() as Score)
+        )
+        await sideBetService.settleSideBets(roundId, allFlatScores)
       }
     }
   },

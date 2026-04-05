@@ -72,16 +72,21 @@ export function SigningPage() {
           </Button>
         </div>
       ) : (
-        <SigningGrid
-          scores={scores}
-          holes={tee.holes}
-          currentUserId={uid}
-          roundId={roundId!}
-          groupId={groupId!}
-          onSign={handleSign}
-          signing={signing}
-          isNet={round.roundType.includes('NET')}
-        />
+        <>
+          <SigningGrid
+            scores={scores}
+            holes={tee.holes}
+            currentUserId={uid}
+            roundId={roundId!}
+            groupId={groupId!}
+            onSign={handleSign}
+            signing={signing}
+            isNet={round.roundType.includes('NET')}
+          />
+          <p className="text-xs text-gray-500 text-center px-2">
+            Round chat is automatically deleted 7 days after the round ends.
+          </p>
+        </>
       )}
     </div>
   )

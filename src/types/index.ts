@@ -26,3 +26,6 @@ export type {
 } from './group'
 export type { GolferScore, ScoreSource } from './golferScore'
 export type { Invite, InviteTargetType } from './invite'
+export type { SideBet, SideBetType, SideBetStatus } from './sideBet'
+export type { Notification, NotificationType } from './notification'
+export type { RoundMessage } from './message'

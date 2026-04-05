@@ -54,6 +54,8 @@ export interface Round {
   /** For two_team rounds: maps uid -> 'A' | 'B' */
   teamAssignments: Record<string, 'A' | 'B'> | null
   simpleGrossScore?: number
+  /** Optional wager amount per person in dollars. 0 or undefined means no wager. */
+  wager?: number
   /** @deprecated moved to Group */
   golferIds?: string[]
   /** @deprecated moved to Group */
@@ -70,6 +72,7 @@ export interface RoundFormData {
   scoringFormat: ScoringFormat
   roundType: RoundType
   isPrivate: boolean
+  wager?: number
   eventId?: string
 }
 

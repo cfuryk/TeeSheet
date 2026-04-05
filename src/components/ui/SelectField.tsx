@@ -18,10 +18,11 @@ interface Props {
   id?: string
   name?: string
   dropdownFooter?: (close: () => void) => ReactNode
+  colorScheme?: 'green' | 'blue'
 }
 
 export const SelectField = forwardRef<HTMLButtonElement, Props>(
-  ({ label, error, options, placeholder = 'Select…', value, onChange, disabled, className = '', id, dropdownFooter }, ref) => {
+  ({ label, error, options, placeholder = 'Select…', value, onChange, disabled, className = '', id, dropdownFooter, colorScheme = 'green' }, ref) => {
     const [open, setOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
     const buttonRef = useRef<HTMLButtonElement>(null)
@@ -62,7 +63,7 @@ export const SelectField = forwardRef<HTMLButtonElement, Props>(
             type="button"
             disabled={disabled}
             onClick={() => setOpen((v) => !v)}
-            className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-base text-left focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+            className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-base text-left focus:outline-none focus:ring-2 ${colorScheme === 'blue' ? 'focus:ring-blue-500' : 'focus:ring-green-500'} transition-colors ${
               error ? 'border-red-500' : 'border-gray-600'
             } ${disabled ? 'bg-gray-900 text-gray-500 cursor-not-allowed' : 'bg-gray-900 text-white hover:border-gray-500 cursor-pointer'}`}
           >
@@ -90,7 +91,7 @@ export const SelectField = forwardRef<HTMLButtonElement, Props>(
                       opt.disabled
                         ? 'text-gray-600 cursor-not-allowed'
                         : opt.value === value
-                        ? 'bg-green-600 text-white cursor-pointer'
+                        ? colorScheme === 'blue' ? 'bg-blue-600 text-white cursor-pointer' : 'bg-green-600 text-white cursor-pointer'
                         : 'text-gray-200 hover:bg-gray-700 cursor-pointer'
                     }`}
                   >

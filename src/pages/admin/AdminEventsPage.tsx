@@ -48,7 +48,7 @@ export function AdminEventsPage() {
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-gray-500">{formatDate(e.date)}</span>
                   <Badge label={e.type === 'single_round' ? 'Single Round' : 'Multi Round'} variant="gray" />
-                  {e.isPrivate && <Badge label="Private" variant="blue" />}
+                  {e.isPrivate && <Badge label="Private" variant="purple" />}
                   <Badge label={`${e.memberIds?.length ?? 0} members`} variant="gray" />
                 </div>
               </Card>

@@ -59,6 +59,7 @@ export const roundService = {
       groupIds: [],
       memberIds: [],
       teamAssignments: null,
+      ...(data.wager && data.wager > 0 ? { wager: data.wager } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
@@ -155,6 +156,27 @@ export const roundService = {
     const q = query(collection(db, 'rounds'), where('__seeded', '==', true))
     const snap = await getDocs(q)
     return snap.docs.map((d) => ({ roundId: d.id, ...d.data() }) as Round)
+  },
+
+  /** Admin: real-time snapshot of all rounds that have a wager set */
+  onWagerRoundsSnapshot(callback: (rounds: Round[]) => void): () => void {
+    const q = query(
+      collection(db, 'rounds'),
+      where('wager', '>', 0),
+      orderBy('wager'),
+      orderBy('date', 'desc'),
+    )
+    return onSnapshot(q, (snap) => {
+      callback(snap.docs.map((d) => ({ roundId: d.id, ...d.data() }) as Round))
+    })
+  },
+
+  /** Admin: fetch id→name map for all rounds */
+  async getAllRoundNames(): Promise<Record<string, string>> {
+    const snap = await getDocs(collection(db, 'rounds'))
+    const map: Record<string, string> = {}
+    for (const d of snap.docs) map[d.id] = (d.data().name as string) ?? d.id
+    return map
   },
 
   async updateTeamAssignments(
