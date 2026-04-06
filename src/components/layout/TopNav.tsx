@@ -42,7 +42,7 @@ export function TopNav() {
     <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
       <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
         <Link to="/" className="flex items-center">
-          <img src="/src/images/Icon.svg" alt="TeeSheet" className="h-8 w-auto" />
+          <img src="/images/Icon.svg" alt="TeeSheet" className="h-8 w-auto" />
         </Link>
 
         {currentUser ? (

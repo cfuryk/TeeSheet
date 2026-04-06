@@ -16,7 +16,9 @@
       "Bash(sed:*)",
       "Bash(firebase deploy:*)",
       "Bash(node scripts/seed.mjs --clean)",
-      "Bash(node scripts/seed.mjs)"
+      "Bash(node scripts/seed.mjs)",
+      "Bash(firebase projects:list)",
+      "Bash(firebase use:*)"
     ]
   }
 }
