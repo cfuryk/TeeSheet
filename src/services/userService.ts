@@ -56,10 +56,10 @@ export const userService = {
   },
 
   async addParticipantRoundId(uid: string, roundId: string): Promise<void> {
-    await updateDoc(doc(db, 'users', uid), {
+    await setDoc(doc(db, 'users', uid), {
       participantRoundIds: arrayUnion(roundId),
       updatedAt: serverTimestamp(),
-    })
+    }, { merge: true })
   },
 
   async recalculateHandicap(uid: string): Promise<void> {
@@ -74,6 +74,6 @@ export const userService = {
     console.log('[handicap] differentials:', differentials)
     const teeSheetHandicap = calculateHandicapIndex(differentials)
     console.log('[handicap] teeSheetHandicap:', teeSheetHandicap)
-    await updateDoc(doc(db, 'users', uid), { teeSheetHandicap, updatedAt: serverTimestamp() })
+    await setDoc(doc(db, 'users', uid), { teeSheetHandicap, updatedAt: serverTimestamp() }, { merge: true })
   },
 }

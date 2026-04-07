@@ -92,7 +92,7 @@ export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation
               onChange={(e) => setInputVal(e.target.value)}
               onBlur={commitInput}
               onKeyDown={(e) => { if (e.key === 'Enter') commitInput() }}
-              className="w-12 h-12 text-center text-3xl font-black bg-transparent text-white border-b-2 border-green-400 outline-none"
+              className="w-12 h-12 text-center text-3xl font-black bg-transparent text-white border-b-2 border-green-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           ) : (
             <button

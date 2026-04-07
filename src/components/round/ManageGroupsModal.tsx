@@ -36,6 +36,12 @@ export function ManageGroupsModal({ roundId, groups, onClose }: Props) {
     setError('')
     try {
       await groupService.moveGolfer(roundId, fromGroupId, toGroupId, golferId)
+      // Auto-delete the source group if it is now empty
+      const fromGroup = groups.find((g) => g.groupId === fromGroupId)
+      if (fromGroup && fromGroup.golferIds.length === 1) {
+        // The one golfer was just moved out — delete the group
+        await groupService.deleteGroup(roundId, fromGroupId)
+      }
     } catch {
       setError('Failed to move player.')
     } finally {

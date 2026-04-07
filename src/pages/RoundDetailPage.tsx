@@ -11,6 +11,7 @@ import { golferScoreService } from '@/services/golferScoreService'
 import { GroupCard } from '@/components/round/GroupCard'
 import { RoundCard } from '@/components/round/RoundCard'
 import { ManageGroupsModal } from '@/components/round/ManageGroupsModal'
+import { InviteModal } from '@/components/event/InviteModal'
 import { Button, Spinner, Alert } from '@/components/ui'
 import {
     matchPlayPoints,
@@ -24,10 +25,12 @@ export function RoundDetailPage() {
     const { round, loading: roundLoading } = useRound(roundId!)
     const { groups, loading: groupsLoading } = useGroups(roundId!)
     const [joining, setJoining] = useState(false)
+    const [joinPickerOpen, setJoinPickerOpen] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [managingGroups, setManagingGroups] = useState(false)
     const [error, setError] = useState('')
+    const [showInvite, setShowInvite] = useState(false)
     const [savingTeams, setSavingTeams] = useState(false)
     const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({})
     const [allScores, setAllScores] = useState<Score[]>([])
@@ -70,31 +73,28 @@ export function RoundDetailPage() {
     const canManage = (isCreator || isAdmin) && round.status === 'pending'
     const userGroup = groups.find((g) => g.golferIds.includes(uid))
     const isCompleted = round.status === 'completed'
+    const isStandalone = !round.eventId
+    const isFull = isStandalone && (round.memberIds?.length ?? 0) >= 4
 
     // Compute winner summary for completed rounds
     const winnerSummary = isCompleted && allScores.length > 0 ? computeWinner(round, groups, allScores) : null
 
-    // Wager payout for completed rounds
-    const wagerPayout = (() => {
-        if (!round.wager || round.wager <= 0 || !winnerSummary) return null
-        const numParticipants = round.memberIds?.length ?? 0
-        const pot = numParticipants * round.wager
-        const numWinners = winnerSummary.winnerCount
-        if (numWinners === 0 || numParticipants === 0) return null
-        const eachCollects = pot / numWinners
-        return { pot, eachCollects, wager: round.wager }
-    })()
-
-    async function handleJoin() {
+    async function handleJoin(targetGroupId?: string) {
         setJoining(true)
         setError('')
         try {
-            const groupId = await groupService.createGroup(round!.roundId, uid)
-            navigate(`/rounds/${round!.roundId}/groups/${groupId}`)
+            if (targetGroupId) {
+                await groupService.addGolferToGroup(round!.roundId, targetGroupId, uid)
+                navigate(`/rounds/${round!.roundId}/groups/${targetGroupId}`)
+            } else {
+                const groupId = await groupService.createGroup(round!.roundId, uid)
+                navigate(`/rounds/${round!.roundId}/groups/${groupId}`)
+            }
         } catch (e) {
             setError((e as Error).message)
         } finally {
             setJoining(false)
+            setJoinPickerOpen(false)
         }
     }
 
@@ -181,15 +181,6 @@ export function RoundDetailPage() {
                                     <p className="text-white font-semibold">{winnerSummary.label}</p>
                                 </div>
                             </div>
-                            {wagerPayout && (
-                                <div className="border-t border-gray-700 pt-2 flex flex-col gap-0.5">
-                                    <p className="text-xs text-gray-400">
-                                        Pot: <span className="text-white font-medium">${wagerPayout.pot.toFixed(2)}</span>
-                                        {' '}· Each winner collects <span className="text-blue-400 font-semibold">${wagerPayout.eachCollects.toFixed(2)}</span>
-                                        {' '}· Each loser paid <span className="text-red-400 font-semibold">${wagerPayout.wager.toFixed(2)}</span>
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     )}
                     <Button onClick={() => navigate(`/rounds/${round.roundId}/summary?from=round`)}>
@@ -208,30 +199,28 @@ export function RoundDetailPage() {
                 </Button>
             )}
 
-            {/* Side Bets button */}
-            {round.scoringFormat !== 'scramble' && (
-                <button
-                    type="button"
-                    onClick={() => navigate(`/rounds/${round.roundId}/side-bets`)}
-                    className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition-colors"
-                >
-                    Side Bets
-                </button>
-            )}
-
             {/* Groups */}
             <div>
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
                         Groups ({groups.length})
                     </h2>
-                    {!isParticipant && round.status === 'pending' && (
-                        <Button size="sm" loading={joining} onClick={handleJoin}>
+                    {!isParticipant && round.status === 'pending' && !isFull && (
+                        <Button size="sm" loading={joining} onClick={() => {
+                            const hasSpace = groups.some((g) => g.golferIds.length < 4)
+                            hasSpace ? setJoinPickerOpen(true) : handleJoin()
+                        }}>
                             + Join Round
                         </Button>
                     )}
+                    {!isParticipant && round.status === 'pending' && isFull && (
+                        <span className="text-xs text-gray-500">Round full (4/4)</span>
+                    )}
                     {isParticipant && !userGroup && round.status === 'pending' && (
-                        <Button size="sm" loading={joining} onClick={handleJoin}>
+                        <Button size="sm" loading={joining} onClick={() => {
+                            const hasSpace = groups.some((g) => g.golferIds.length < 4)
+                            hasSpace ? setJoinPickerOpen(true) : handleJoin()
+                        }}>
                             + New Group
                         </Button>
                     )}
@@ -261,6 +250,9 @@ export function RoundDetailPage() {
                 <>
                     <Button variant="secondary" onClick={() => navigate(`/rounds/${round.roundId}/edit`)}>
                         Edit Round
+                    </Button>
+                    <Button onClick={() => setShowInvite(true)}>
+                        + Invite Golfers
                     </Button>
                     {groups.length > 1 && (
                         <Button variant="secondary" onClick={() => setManagingGroups(true)}>
@@ -294,12 +286,62 @@ export function RoundDetailPage() {
                 )
             )}
 
+            {showInvite && (
+                <InviteModal
+                    targetType="round"
+                    targetId={round.roundId}
+                    createdBy={uid}
+                    targetName={round.name}
+                    onClose={() => setShowInvite(false)}
+                />
+            )}
+
             {managingGroups && (
                 <ManageGroupsModal
                     roundId={round.roundId}
                     groups={groups}
                     onClose={() => setManagingGroups(false)}
                 />
+            )}
+
+            {joinPickerOpen && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 pb-4">
+                    <div className="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl flex flex-col">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+                            <h2 className="font-bold text-white text-lg">Join a Group</h2>
+                            <button
+                                type="button"
+                                onClick={() => setJoinPickerOpen(false)}
+                                className="text-gray-400 hover:text-white transition-colors text-2xl leading-none"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-4 flex flex-col gap-3">
+                            {groups.filter((g) => g.golferIds.length < 4).map((g) => (
+                                <button
+                                    key={g.groupId}
+                                    type="button"
+                                    disabled={joining}
+                                    onClick={() => handleJoin(g.groupId)}
+                                    className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 hover:border-green-500/50 transition-colors"
+                                >
+                                    <p className="text-white font-semibold">{g.name ?? 'Group'}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{g.golferIds.length} / 4 players</p>
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                disabled={joining}
+                                onClick={() => handleJoin()}
+                                className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 hover:border-green-500/50 transition-colors"
+                            >
+                                <p className="text-white font-semibold">+ Create New Group</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Start a new group by yourself</p>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     )

@@ -9,6 +9,8 @@ import { getDocs, collection } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { userService } from '@/services/userService'
 import { groupService } from '@/services/groupService'
+import { roundService } from '@/services/roundService'
+import { golferScoreService } from '@/services/golferScoreService'
 import { PlayerSlot } from '@/components/round/PlayerSlot'
 import { TeamAssignment } from '@/components/round/TeamAssignment'
 import type { UserProfile, Group } from '@/types'
@@ -33,14 +35,18 @@ export function GroupPage() {
     const [showConflict, setShowConflict] = useState(false)
     const [abandoning, setAbandoning] = useState(false)
 
-    // Edit name state
+    // Edit name state (event rounds only)
     const [editing, setEditing] = useState(false)
     const [editName, setEditName] = useState('')
     const [savingName, setSavingName] = useState(false)
 
-    // Delete state
-    const [confirmDelete, setConfirmDelete] = useState(false)
-    const [deleting, setDeleting] = useState(false)
+    // Delete group state (event rounds only)
+    const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(false)
+    const [deletingGroup, setDeletingGroup] = useState(false)
+
+    // Delete round state (standalone rounds only)
+    const [confirmDeleteRound, setConfirmDeleteRound] = useState(false)
+    const [deletingRound, setDeletingRound] = useState(false)
 
     useEffect(() => {
         if (!group) return
@@ -70,6 +76,7 @@ export function GroupPage() {
     const isInGroup = group.golferIds.includes(uid)
     const isBestBall = round.roundType === 'BEST_BALL_GROSS' || round.roundType === 'BEST_BALL_NET'
     const isScramble = round.scoringFormat === 'scramble'
+    const isStandalone = !round.eventId
     const scrambleAdminId = group.groupAdminId ?? group.golferIds[0]
 
     // Uneven group size warning for scramble
@@ -165,30 +172,48 @@ export function GroupPage() {
         }
     }
 
-    async function handleDelete() {
-        setDeleting(true)
+    async function handleDeleteGroup() {
+        setDeletingGroup(true)
         try {
             await groupService.deleteGroup(roundId!, groupId!)
             navigate(`/rounds/${roundId}`)
         } catch {
             setError('Failed to delete group.')
-            setDeleting(false)
-            setConfirmDelete(false)
+            setDeletingGroup(false)
+            setConfirmDeleteGroup(false)
         }
     }
 
-    const statusVariant = { pending: 'gray', active: 'yellow', completed: 'blue', signed: 'green' } as const
+    async function handleDeleteRound() {
+        setDeletingRound(true)
+        try {
+            const memberIds = round!.memberIds ?? []
+            await golferScoreService.deleteScoresByRound(round!.roundId)
+            await roundService.deleteRound(round!.roundId)
+            await Promise.all(memberIds.map((id) => userService.recalculateHandicap(id)))
+            navigate('/')
+        } catch {
+            setError('Failed to delete round.')
+            setDeletingRound(false)
+            setConfirmDeleteRound(false)
+        }
+    }
+
+    const statusVariant = { pending: 'gray', active: 'blue', completed: 'green', signed: 'green' } as const
+    const statusLabel = { pending: 'Pending', active: 'Active', completed: 'Completed', signed: 'Signed' } as const
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Back button */}
-            <Button onClick={() => navigate(`/rounds/${roundId}`)}>
-                Back to Round
-            </Button>
+            {/* Back button — event rounds only */}
+            {!isStandalone && (
+                <Button onClick={() => navigate(`/rounds/${roundId}`)}>
+                    Back to Round
+                </Button>
+            )}
 
             {/* Header */}
             <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-                {editing ? (
+                {!isStandalone && editing ? (
                     <div className="flex flex-col gap-3">
                         <Input
                             label="Group Name"
@@ -208,12 +233,12 @@ export function GroupPage() {
                 ) : (
                     <div className="flex items-stretch justify-between">
                         <div>
-                            <h1 className="text-xl font-bold text-white">{group.name ?? 'Group'}</h1>
+                            <h1 className="text-xl font-bold text-white">{isStandalone ? round.name : (group.name ?? 'Group')}</h1>
                             <p className="text-gray-400 text-sm">{round.courseName}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Badge label={group.status} variant={statusVariant[group.status]} />
-                            {canEdit && (
+                            <Badge label={statusLabel[group.status]} variant={statusVariant[group.status]} />
+                            {!isStandalone && canEdit && (
                                 <button
                                     type="button"
                                     onClick={handleStartEdit}
@@ -272,6 +297,17 @@ export function GroupPage() {
                 />
             )}
 
+            {/* Invite Golfers — standalone rounds, pending, creator */}
+            {isStandalone && (round.isPrivate ? isCreator : isInGroup) && group.status === 'pending' && group.golferIds.length < 4 && (
+                <Button
+                    variant="secondary"
+                    onClick={() => navigate(`/invite-golfers?targetType=round&targetId=${roundId}&roundName=${encodeURIComponent(round.name)}&groupId=${groupId}`)}
+                    className="w-full"
+                >
+                    + Invite Golfers
+                </Button>
+            )}
+
             {/* Start group button */}
             {group.status === 'pending' && isCreator && isInGroup && (
                 <div className="flex flex-col gap-2">
@@ -320,16 +356,16 @@ export function GroupPage() {
                 </div>
             )}
 
-            {/* Delete group — creator only, pending only */}
-            {canEdit && (
-                confirmDelete ? (
+            {/* Delete group — event rounds only, creator, pending */}
+            {!isStandalone && canEdit && (
+                confirmDeleteGroup ? (
                     <div className="flex flex-col gap-2 rounded-xl border border-red-800 bg-red-900/20 p-4">
                         <p className="text-sm text-red-300 text-center">Delete this group? This cannot be undone.</p>
                         <div className="flex gap-2">
                             <Button
                                 size="sm"
-                                loading={deleting}
-                                onClick={handleDelete}
+                                loading={deletingGroup}
+                                onClick={handleDeleteGroup}
                                 className="flex-1 bg-red-600 hover:bg-red-700"
                             >
                                 Yes, delete
@@ -337,7 +373,7 @@ export function GroupPage() {
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                onClick={() => setConfirmDelete(false)}
+                                onClick={() => setConfirmDeleteGroup(false)}
                                 className="flex-1"
                             >
                                 Cancel
@@ -347,10 +383,45 @@ export function GroupPage() {
                 ) : (
                     <Button
                         variant="danger"
-                        onClick={() => setConfirmDelete(true)}
+                        onClick={() => setConfirmDeleteGroup(true)}
                         className="w-full"
                     >
                         Delete Group
+                    </Button>
+                )
+            )}
+
+            {/* Delete round — standalone rounds only, creator */}
+            {isStandalone && isCreator && (
+                confirmDeleteRound ? (
+                    <div className="flex flex-col gap-2 rounded-xl border border-red-800 bg-red-900/20 p-4">
+                        <p className="text-sm text-red-300 text-center">Delete this round? This cannot be undone.</p>
+                        <div className="flex gap-2">
+                            <Button
+                                size="sm"
+                                loading={deletingRound}
+                                onClick={handleDeleteRound}
+                                className="flex-1 bg-red-600 hover:bg-red-700"
+                            >
+                                Yes, delete
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setConfirmDeleteRound(false)}
+                                className="flex-1"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <Button
+                        variant="danger"
+                        onClick={() => setConfirmDeleteRound(true)}
+                        className="w-full"
+                    >
+                        Delete Round
                     </Button>
                 )
             )}

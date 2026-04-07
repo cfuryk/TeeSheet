@@ -27,13 +27,13 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
 
   function renderGroup(group: Hole[], label: 'OUT' | 'IN') {
     return (
-      <table className="w-full text-xs border-collapse">
+      <table className="w-full text-xs border-collapse table-fixed">
         <thead>
           <tr className="bg-gray-700">
             <th className="p-2 text-left border border-gray-600 text-gray-300 w-10">Hole</th>
             <th className="p-2 text-center border border-gray-600 text-gray-300 w-10">Par</th>
             {scores.map((sc) => (
-              <th key={sc.golferId} className="p-2 text-center border border-gray-600 text-gray-300">
+              <th key={sc.golferId} className="p-2 text-center border border-gray-600 text-gray-300 truncate">
                 {sc.golferName}
               </th>
             ))}

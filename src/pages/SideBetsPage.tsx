@@ -85,7 +85,7 @@ export function SideBetsPage() {
           }
           className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition-colors"
         >
-          {from === 'scorecard' ? 'Back to Scorecard' : 'Back to Round'}
+          {from === 'scorecard' ? 'Back to Score Entry' : 'Back to Round'}
         </button>
         {!isScramble && (
           <button

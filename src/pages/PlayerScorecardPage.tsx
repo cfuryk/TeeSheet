@@ -16,8 +16,7 @@ export function PlayerScorecardPage() {
   const groupId = searchParams.get('groupId')
   const { round, loading: roundLoading } = useRound(roundId!)
   const { groups, loading: groupsLoading } = useGroups(roundId!)
-  const [score, setScore] = useState<Score | null>(null)
-  const [partnerScore, setPartnerScore] = useState<Score | null>(null)
+  const [groupScores, setGroupScores] = useState<Score[]>([])
   const [tee, setTee] = useState<Tee | null>(null)
 
   useEffect(() => {
@@ -30,51 +29,24 @@ export function PlayerScorecardPage() {
 
   useEffect(() => {
     if (groups.length === 0 || !golferId) return
-    // Find which group this golfer is in
     const group = groups.find((g) => g.golferIds.includes(golferId))
     if (!group) return
-
     scoreService.getAllScores(roundId!, group.groupId).then((scores) => {
-      const mine = scores.find((s) => s.golferId === golferId) ?? null
-      setScore(mine)
-
-      // For best ball rounds, also load the partner's score
-      const rt = round?.roundType
-      if (rt === 'BEST_BALL_GROSS' || rt === 'BEST_BALL_NET') {
-        const teamA = group.teams?.teamA ?? []
-        const teamB = group.teams?.teamB ?? []
-        const myTeam = teamA.includes(golferId) ? teamA : teamB.includes(golferId) ? teamB : []
-        const partnerId = myTeam.find((id) => id !== golferId)
-        if (partnerId) {
-          const partner = scores.find((s) => s.golferId === partnerId) ?? null
-          setPartnerScore(partner)
-        }
-      } else if (rt?.startsWith('TWO_TEAM_BB')) {
-        const assignments = round?.teamAssignments ?? {}
-        const myTeam = assignments[golferId]
-        const partnerId = group.golferIds.find(
-          (id) => id !== golferId && assignments[id] === myTeam
-        )
-        if (partnerId) {
-          const partner = scores.find((s) => s.golferId === partnerId) ?? null
-          setPartnerScore(partner)
-        }
-      }
+      // Put the viewed golfer first, then the rest
+      const mine = scores.find((s) => s.golferId === golferId)
+      const others = scores.filter((s) => s.golferId !== golferId)
+      setGroupScores(mine ? [mine, ...others] : others)
     })
-  }, [groups, golferId, roundId, round])
+  }, [groups, golferId, roundId])
 
-  if (roundLoading || groupsLoading || !tee || !score) {
+  if (roundLoading || groupsLoading || !tee || groupScores.length === 0) {
     return <div className="flex justify-center py-12"><Spinner /></div>
   }
 
   const useNet = round!.roundType.includes('NET')
   const isBestBall = round!.roundType.includes('BEST_BALL') || round!.roundType.includes('BB')
-  const displayScores = partnerScore ? [score, partnerScore] : [score]
-  const title = partnerScore
-    ? `${score.golferName} / ${partnerScore.golferName}`
-    : score.golferName
 
-  const backLabel = from === 'scorecard' ? 'Back to Scorecard' : 'Back to Leaderboard'
+  const backLabel = from === 'scorecard' ? 'Back to Score Entry' : 'Back to Leaderboard'
   function handleBack() {
     if (from === 'scorecard' && groupId) {
       navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
@@ -90,8 +62,8 @@ export function PlayerScorecardPage() {
       <Button onClick={handleBack}>
         {backLabel}
       </Button>
-      <h1 className="text-xl font-bold text-white">{title}</h1>
-      <ScorecardGrid scores={displayScores} holes={tee.holes} isNet={useNet} showBestBall={isBestBall && !!partnerScore} />
+      <h1 className="text-xl font-bold text-white">{groupScores[0].golferName}</h1>
+      <ScorecardGrid scores={groupScores} holes={tee.holes} isNet={useNet} showBestBall={isBestBall && groupScores.length > 1} />
     </div>
   )
 }

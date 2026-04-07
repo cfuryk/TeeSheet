@@ -33,6 +33,7 @@ import { AdminEventsPage } from '@/pages/admin/AdminEventsPage'
 import { AdminScoresPage } from '@/pages/admin/AdminScoresPage'
 import { AdminBetsPage } from '@/pages/admin/AdminBetsPage'
 import { InvitePage } from '@/pages/InvitePage'
+import { InviteGolfersPage } from '@/pages/InviteGolfersPage'
 import { SideBetsPage } from '@/pages/SideBetsPage'
 import { SideBetDetailPage } from '@/pages/SideBetDetailPage'
 
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/admin/bets" element={<ProtectedRoute requireAdmin><AdminBetsPage /></ProtectedRoute>} />
 
             <Route path="/invite/:token" element={<InvitePage />} />
+            <Route path="/invite-golfers" element={<ProtectedRoute><InviteGolfersPage /></ProtectedRoute>} />
           </Route>
 
           {/* Fallback */}

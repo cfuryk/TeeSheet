@@ -66,6 +66,7 @@ export function EventDetailPage() {
           targetType="event"
           targetId={event.eventId}
           createdBy={uid}
+          targetName={event.name}
           onClose={() => setShowInvite(false)}
         />
       )}

@@ -18,7 +18,8 @@
       "Bash(node scripts/seed.mjs --clean)",
       "Bash(node scripts/seed.mjs)",
       "Bash(firebase projects:list)",
-      "Bash(firebase use:*)"
+      "Bash(firebase use:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
     ]
   }
 }

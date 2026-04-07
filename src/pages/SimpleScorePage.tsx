@@ -124,7 +124,7 @@ export function SimpleScorePage() {
           />
 
           <Input
-            label="Gross Score"
+            label="Score"
             type="number"
             placeholder="e.g. 92"
             {...register('grossScore')}

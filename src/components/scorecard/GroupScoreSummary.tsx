@@ -20,7 +20,7 @@ export function GroupScoreSummary({ scores, holes, isNet, currentHole }: Props) 
         onClick={() => setOpen((o) => !o)}
         className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-750 transition-colors"
       >
-        <span className="text-sm font-semibold text-white">Group Scores</span>
+        <span className="text-sm font-semibold text-white">Group Leaderboard</span>
         <svg
           className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
@@ -30,7 +30,16 @@ export function GroupScoreSummary({ scores, holes, isNet, currentHole }: Props) 
       </button>
       {open && (
         <div className="px-4 pb-4 border-t border-gray-700 pt-3 flex flex-col gap-2">
-          {scores.map((sc) => {
+          {[...scores].sort((a, b) => {
+            const aVsPar = isNet ? calculateTotalNetVsPar(a.scores, holes) : calculateTotalVsPar(a.scores, holes)
+            const bVsPar = isNet ? calculateTotalNetVsPar(b.scores, holes) : calculateTotalVsPar(b.scores, holes)
+            const aHoles = a.scores.length
+            const bHoles = b.scores.length
+            if (aHoles === 0 && bHoles === 0) return 0
+            if (aHoles === 0) return 1
+            if (bHoles === 0) return -1
+            return aVsPar - bVsPar
+          }).map((sc) => {
           const holesPlayed = sc.scores.length
           const gross = sc.scores.reduce((s, h) => s + h.grossScore, 0)
           const net = sc.scores.reduce((s, h) => s + h.netScore, 0)

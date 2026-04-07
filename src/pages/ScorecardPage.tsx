@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useScore } from '@/hooks/useScore'
 import { useAuth } from '@/hooks/useAuth'
 import { scoreService } from '@/services/scoreService'
+import { roundService } from '@/services/roundService'
+import { golferScoreService } from '@/services/golferScoreService'
+import { userService } from '@/services/userService'
 import { HoleInfo } from '@/components/scorecard/HoleInfo'
 import { HoleNavigation } from '@/components/scorecard/HoleNavigation'
 import { GroupScoreSummary } from '@/components/scorecard/GroupScoreSummary'
@@ -18,6 +21,8 @@ export function ScorecardPage() {
   const navigate = useNavigate()
   const [currentHole, setCurrentHole] = useState(1)
   const [holeInitialised, setHoleInitialised] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   // Jump to first unscored hole once scores load
   useEffect(() => {
@@ -37,6 +42,8 @@ export function ScorecardPage() {
 
   const { round, group, scores, tee } = ctx
   const isScramble = round.scoringFormat === 'scramble'
+  const isStandalone = !round.eventId
+  const isCreator = round.createdBy === currentUser?.uid
   const scrambleAdminId = group?.groupAdminId ?? group?.golferIds[0]
   const isScrambleAdmin = isScramble && currentUser?.uid === scrambleAdminId
   const chatDisplayName = userProfile?.displayName ?? currentUser?.displayName ?? 'Player'
@@ -73,6 +80,20 @@ export function ScorecardPage() {
     )
   }
 
+  async function handleCancelRound() {
+    setCancelling(true)
+    try {
+      const memberIds = round.memberIds ?? []
+      await golferScoreService.deleteScoresByRound(round.roundId)
+      await roundService.deleteRound(round.roundId)
+      await Promise.all(memberIds.map((id) => userService.recalculateHandicap(id)))
+      navigate('/')
+    } catch {
+      setCancelling(false)
+      setConfirmCancel(false)
+    }
+  }
+
   // Non-admin scramble member: read-only view
   if (isScramble && !isScrambleAdmin) {
     const adminName = myScore?.golferName ?? group?.name ?? 'Admin'
@@ -90,7 +111,9 @@ export function ScorecardPage() {
             <ScorecardGrid scores={[myScore]} holes={tee.holes} isNet={false} />
           </div>
         )}
-        <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
+        {round.eventId && (
+          <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
+        )}
       </div>
     )
   }
@@ -115,13 +138,15 @@ export function ScorecardPage() {
           End Round & Sign
         </Button>
       )}
-      <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
+      {round.eventId && (
+        <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
+      )}
       {!isScramble && (
         <GroupScoreSummary scores={scores} holes={tee.holes} isNet={isNetRound} currentHole={currentHole} />
       )}
       {!isScramble && (
-        <>
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {round.eventId && (
             <button
               type="button"
               onClick={() => navigate(`/rounds/${roundId}/summary?from=scorecard&groupId=${groupId}`)}
@@ -129,22 +154,46 @@ export function ScorecardPage() {
             >
               Leaderboard
             </button>
-            <button
-              type="button"
-              onClick={() => navigate(`/rounds/${roundId}/scorecard/${currentUser!.uid}?from=scorecard&groupId=${groupId}`)}
-              className="flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-base transition-colors"
-            >
-              View Scorecard
-            </button>
-          </div>
+          )}
           <button
             type="button"
-            onClick={() => navigate(`/rounds/${roundId}/side-bets?from=scorecard&groupId=${groupId}`)}
-            className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition-colors"
+            onClick={() => navigate(`/rounds/${roundId}/scorecard/${currentUser!.uid}?from=scorecard&groupId=${groupId}`)}
+            className="flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-base transition-colors"
           >
-            Side Bets
+            View Scorecard
           </button>
-        </>
+        </div>
+      )}
+
+      {/* Cancel Round — standalone rounds, creator only */}
+      {isStandalone && isCreator && (
+        confirmCancel ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-red-800 bg-red-900/20 p-4">
+            <p className="text-sm text-red-300 text-center">Cancel this round? All scores will be deleted.</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                loading={cancelling}
+                onClick={handleCancelRound}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                Yes, cancel round
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setConfirmCancel(false)}
+                className="flex-1"
+              >
+                Keep Playing
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="danger" onClick={() => setConfirmCancel(true)} className="w-full">
+            Cancel Round
+          </Button>
+        )
       )}
     </div>
   )
