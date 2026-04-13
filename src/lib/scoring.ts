@@ -1,4 +1,4 @@
-import type { HoleScore, Scorecard, Hole } from '@/types'
+import type { HoleScore, Scorecard, Hole, Score } from '@/types'
 
 export function calculateNetScore(grossScore: number, strokes: number): number {
   return grossScore - strokes
@@ -26,6 +26,75 @@ export function calculateTotalVsPar(scores: HoleScore[], holes: Hole[]): number 
     const hole = holes.find((h) => h.number === s.hole)
     return sum + (hole ? s.grossScore - hole.par : 0)
   }, 0)
+}
+
+export interface LeaderboardEntry {
+  score: Score
+  vsPar: number | null
+  holesPlayed: number
+  rank: number
+  rankLabel: string
+}
+
+/**
+ * Builds a sorted leaderboard with tied-rank labels.
+ *
+ * Rules:
+ * - Players who haven't started (holesPlayed === 0) go to the bottom with no rank label.
+ * - Among started players, sort by vsPar ascending (best first).
+ * - Tiebreak: further through the round (more holes played) sorts higher.
+ * - Tied players share the same rank (same vsPar = same rank).
+ * - Rank label is "T3" when multiple players share a rank, plain "3" otherwise.
+ * - Unstarted players show an empty rank label.
+ */
+export function buildLeaderboard(scores: Score[], holes: Hole[], useNet = false): LeaderboardEntry[] {
+  const entries: LeaderboardEntry[] = scores.map((sc) => {
+    const holesPlayed = sc.scores.length
+    const vsPar = holesPlayed > 0
+      ? sc.scores.reduce((sum, hs) => {
+          const h = holes.find((hole) => hole.number === hs.hole)
+          if (!h) return sum
+          return sum + (useNet ? hs.netScore - h.par : hs.grossScore - h.par)
+        }, 0)
+      : null
+    return { score: sc, vsPar, holesPlayed, rank: 0, rankLabel: '' }
+  })
+
+  entries.sort((a, b) => {
+    if (a.vsPar === null && b.vsPar === null) return 0
+    if (a.vsPar === null) return 1
+    if (b.vsPar === null) return -1
+    if (a.vsPar !== b.vsPar) return a.vsPar - b.vsPar
+    return b.holesPlayed - a.holesPlayed
+  })
+
+  // Assign ranks only to started players; unstarted stay at rank 0
+  const started = entries.filter((e) => e.vsPar !== null)
+  for (let i = 0; i < started.length; i++) {
+    if (i === 0) {
+      started[i].rank = 1
+    } else {
+      const prev = started[i - 1]
+      const curr = started[i]
+      // Same vsPar = tied = same rank
+      curr.rank = curr.vsPar === prev.vsPar ? prev.rank : i + 1
+    }
+  }
+
+  // Count how many started players share each rank
+  const rankCounts: Record<number, number> = {}
+  for (const e of started) rankCounts[e.rank] = (rankCounts[e.rank] ?? 0) + 1
+
+  // Apply labels
+  for (const e of entries) {
+    if (e.vsPar === null) {
+      e.rankLabel = '-'
+    } else {
+      e.rankLabel = rankCounts[e.rank] > 1 ? `T${e.rank}` : `${e.rank}`
+    }
+  }
+
+  return entries
 }
 
 export function calculateTotalNetVsPar(scores: HoleScore[], holes: Hole[]): number {

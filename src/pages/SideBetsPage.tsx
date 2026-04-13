@@ -98,11 +98,11 @@ export function SideBetsPage() {
         )}
       </div>
 
-      <h1 className="text-2xl font-bold text-white">Side Bets</h1>
+      <h1 className="text-2xl font-bold text-brand">Side Bets</h1>
 
       {isScramble && (
-        <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3">
-          <p className="text-sm text-gray-400">Side bets are not available for scramble rounds.</p>
+        <div className="bg-card-bg border border-card-border rounded-xl px-4 py-3">
+          <p className="text-sm text-muted">Side bets are not available for scramble rounds.</p>
         </div>
       )}
 
@@ -112,9 +112,9 @@ export function SideBetsPage() {
         <>
           {/* My Side Bets */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">My Side Bets</h2>
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">My Side Bets</h2>
             {myBets.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">You have no side bets in this round.</p>
+              <p className="text-sm text-muted text-center py-4">You have no side bets in this round.</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {myBets.map((bet) => (
@@ -137,9 +137,9 @@ export function SideBetsPage() {
 
           {/* All Side Bets */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">All Side Bets</h2>
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">All Side Bets</h2>
             {sideBets.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No side bets yet. Be the first to create one!</p>
+              <p className="text-sm text-muted text-center py-4">No side bets yet. Be the first to create one!</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {sideBets.map((bet) => (
@@ -214,12 +214,12 @@ function BetCard({
     <button
       type="button"
       onClick={() => navigate(`/rounds/${roundId}/side-bets/${bet.sideBetId}${from === 'scorecard' && fromGroupId ? `?from=scorecard&groupId=${fromGroupId}` : ''}`)}
-      className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-3 hover:border-blue-600/50 transition-colors"
+      className="w-full text-left bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-3 hover:border-blue-600/50 transition-colors"
     >
       {/* Type + status row */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-white">{BET_TYPE_LABELS[bet.type]}</span>
+          <span className="text-sm font-semibold text-brand">{BET_TYPE_LABELS[bet.type]}</span>
           {bet.isPublic && (
             <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
               Public
@@ -237,22 +237,22 @@ function BetCard({
             className={`px-2 py-0.5 rounded-full text-xs font-medium ${
               bet.winnersIds?.includes(id)
                 ? 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/50'
-                : 'bg-gray-700 text-gray-300'
+                : 'bg-card-bg text-muted'
             }`}
           >
             {getName(id)}
           </span>
         ))}
         {bet.invitedIds.map((id) => (
-          <span key={id} className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700/50 text-gray-500 ring-1 ring-gray-600">
-            {getName(id)} <span className="text-gray-600">?</span>
+          <span key={id} className="px-2 py-0.5 rounded-full text-xs font-medium bg-card-bg/50 text-muted ring-1 ring-card-border">
+            {getName(id)} <span className="text-muted">?</span>
           </span>
         ))}
       </div>
 
       {/* Wager */}
-      <p className="text-sm text-gray-400">
-        ${bet.wagerPerPerson.toFixed(2)} <span className="text-gray-500">/ person</span>
+      <p className="text-sm text-muted">
+        ${bet.wagerPerPerson.toFixed(2)} <span className="text-muted">/ person</span>
       </p>
 
       {/* Winner */}

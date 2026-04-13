@@ -55,7 +55,7 @@ export function DateInput({ label, error, value = '', onChange, minToday = false
 
   return (
     <div className="flex flex-col gap-1">
-      {label && <label className="text-sm font-medium text-gray-300">{label}</label>}
+      {label && <label className="text-sm font-medium text-brand">{label}</label>}
       <div className="flex gap-2">
         <SelectField
           options={monthOptions}
@@ -79,7 +79,7 @@ export function DateInput({ label, error, value = '', onChange, minToday = false
           className="w-28"
         />
       </div>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   )
 }

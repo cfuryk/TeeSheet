@@ -16,7 +16,7 @@ function formatTime(msg: RoundMessage): string {
 
 export function RoundChat({ roundId, uid, displayName }: Props) {
   const [messages, setMessages] = useState<RoundMessage[]>([])
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [input, setInput] = useState('')
   const [unread, setUnread] = useState(0)
   const [sending, setSending] = useState(false)
@@ -78,23 +78,21 @@ export function RoundChat({ roundId, uid, displayName }: Props) {
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+    <div className="bg-brand border border-brand rounded-xl overflow-hidden">
       {/* Header toggle */}
       <button
         type="button"
         onClick={() => open ? setOpen(false) : handleOpen()}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-750 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between text-left transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-white">Chat</span>
-          {!open && unread > 0 && (
-            <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 font-semibold leading-none">
-              {unread}
-            </span>
-          )}
+          <span className="text-sm font-semibold text-white">Trash Talk</span>
+          <span className="bg-danger text-white text-xs rounded-full px-1.5 py-0.5 font-semibold leading-none">
+            {unread > 0 ? unread : messages.length}
+          </span>
         </div>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-white/60 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -106,22 +104,22 @@ export function RoundChat({ roundId, uid, displayName }: Props) {
           {/* Message list */}
           <div
             ref={listRef}
-            className="px-3 py-3 flex flex-col gap-3 overflow-y-auto max-h-48 border-t border-gray-700"
+            className="px-3 py-3 flex flex-col gap-3 overflow-y-auto max-h-48 border-t border-white/20"
           >
             {messages.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-2">No messages yet. Say something!</p>
+              <p className="text-xs text-white/60 text-center py-2">No messages yet. Say something!</p>
             ) : (
               messages.map((msg) => {
                 const isOwn = msg.uid === uid
                 return (
                   <div key={msg.messageId} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    <p className="text-xs text-gray-500 mb-0.5 px-1">
+                    <p className="text-xs text-white/60 mb-0.5 px-1">
                       {isOwn ? 'You' : msg.displayName} · {formatTime(msg)}
                     </p>
                     <div className={`px-3 py-2 text-sm max-w-[75%] break-words ${
                       isOwn
-                        ? 'bg-blue-600 text-white rounded-xl rounded-br-sm'
-                        : 'bg-gray-700 text-gray-200 rounded-xl rounded-bl-sm'
+                        ? 'bg-white text-brand rounded-xl rounded-br-sm'
+                        : 'bg-white/20 text-white rounded-xl rounded-bl-sm'
                     }`}>
                       {msg.text}
                     </div>
@@ -132,20 +130,20 @@ export function RoundChat({ roundId, uid, displayName }: Props) {
           </div>
 
           {/* Input row */}
-          <div className="border-t border-gray-700 px-3 py-2 flex gap-2">
+          <div className="border-t border-white/20 px-3 py-2 flex gap-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="flex-1 bg-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 bg-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/50 outline-none focus:ring-1 focus:ring-white"
             />
             <button
               type="button"
               onClick={handleSend}
               disabled={!input.trim() || sending}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm transition-colors"
+              className="bg-danger hover:bg-danger/90 disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

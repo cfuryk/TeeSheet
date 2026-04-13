@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { scoreService } from '@/services/scoreService'
 import { groupService } from '@/services/groupService'
 import { roundService } from '@/services/roundService'
@@ -8,78 +8,65 @@ import type { ActiveGroupContext, Score } from '@/types'
 export function useScore(roundId: string, groupId: string) {
   const [ctx, setCtx] = useState<ActiveGroupContext | null>(null)
   const [loading, setLoading] = useState(true)
+  // Keep a ref so snapshot callbacks always see latest ctx without stale closure
+  const ctxRef = useRef<ActiveGroupContext | null>(null)
 
   useEffect(() => {
     if (!roundId || !groupId) return
 
-    let teeCache: ActiveGroupContext['tee'] | null = null
+    let cancelled = false
 
-    const unsubRound = roundService.onRoundSnapshot(roundId, async (round) => {
-      if (!round) return
-      if (!teeCache) {
-        const course = await courseService.getCourse(round.courseId)
-        const tee = course?.tees.find((t) => t.teeId === round.teeId)
-        if (!tee) return
-        teeCache = tee
-        setCtx((prev) => prev ? { ...prev, round } : null)
-      } else {
-        setCtx((prev) => prev ? { ...prev, round } : null)
-      }
+    // Bootstrap: fetch everything once, then subscribe to live updates
+    async function init() {
+      const [round, group] = await Promise.all([
+        roundService.getRound(roundId),
+        groupService.getGroup(roundId, groupId),
+      ])
+      if (!round || !group || cancelled) return
+
+      const course = await courseService.getCourse(round.courseId)
+      const tee = course?.tees.find((t) => t.teeId === round.teeId)
+      if (!tee || cancelled) return
+
+      const scores = await scoreService.getAllScores(roundId, groupId)
+      if (cancelled) return
+
+      const initial: ActiveGroupContext = { round, group, scores, tee }
+      ctxRef.current = initial
+      setCtx(initial)
+      setLoading(false)
+    }
+
+    init()
+
+    // Live subscriptions — only update after bootstrap has set ctx
+    const unsubRound = roundService.onRoundSnapshot(roundId, (round) => {
+      if (!round || !ctxRef.current) return
+      const next = { ...ctxRef.current, round }
+      ctxRef.current = next
+      setCtx(next)
     })
 
-    const unsubGroup = groupService.onGroupSnapshot(roundId, groupId, async (group) => {
-      if (!group) return
-      if (!teeCache) {
-        const round = await roundService.getRound(roundId)
-        if (round) {
-          const course = await courseService.getCourse(round.courseId)
-          const tee = course?.tees.find((t) => t.teeId === round.teeId)
-          if (tee) {
-            teeCache = tee
-            setCtx((prev) =>
-              prev ? { ...prev, group } : null
-            )
-          }
-        }
-      } else {
-        setCtx((prev) => prev ? { ...prev, group } : null)
-      }
+    const unsubGroup = groupService.onGroupSnapshot(roundId, groupId, (group) => {
+      if (!group || !ctxRef.current) return
+      const next = { ...ctxRef.current, group }
+      ctxRef.current = next
+      setCtx(next)
     })
 
     const unsubScores = scoreService.onScoresSnapshot(roundId, groupId, (scores) => {
-      setCtx((prev) => {
-        if (prev) return { ...prev, scores }
-        return null
-      })
-      // Bootstrap ctx once we have all pieces
-      setCtx((prev) => {
-        if (prev) return prev
-        return null
-      })
-      setLoading(false)
-    })
-
-    // Bootstrap: fetch round + group once to initialize ctx
-    Promise.all([
-      roundService.getRound(roundId),
-      groupService.getGroup(roundId, groupId),
-    ]).then(async ([round, group]) => {
-      if (!round || !group) return
-      const course = await courseService.getCourse(round.courseId)
-      const tee = course?.tees.find((t) => t.teeId === round.teeId)
-      if (!tee) return
-      teeCache = tee
-      const scores = await scoreService.getAllScores(roundId, groupId)
-      setCtx({ round, group, scores, tee })
-      setLoading(false)
+      if (!ctxRef.current) return
+      const next = { ...ctxRef.current, scores }
+      ctxRef.current = next
+      setCtx(next)
     })
 
     return () => {
+      cancelled = true
       unsubRound()
       unsubGroup()
       unsubScores()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId, groupId])
 
   return { ctx, loading }

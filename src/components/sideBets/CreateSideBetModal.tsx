@@ -58,7 +58,7 @@ function PlayerMultiSelect({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-2 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 hover:border-gray-500 transition-colors"
+        className="w-full flex items-center justify-between gap-2 bg-btn-secondary border border-card-border rounded-lg px-3 py-2 text-sm text-muted hover:border-card-border transition-colors"
       >
         <span className="truncate">{displayText}</span>
         <svg className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -66,9 +66,9 @@ function PlayerMultiSelect({
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-20 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-card-bg border border-card-border rounded-xl shadow-xl z-20 overflow-hidden">
           {options.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-500">No other players in this round.</p>
+            <p className="px-3 py-2 text-sm text-muted">No other players in this round.</p>
           ) : (
             options.map((m) => (
               <button
@@ -76,11 +76,11 @@ function PlayerMultiSelect({
                 type="button"
                 onClick={() => toggle(m.uid)}
                 className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-                  selected.includes(m.uid) ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-700'
+                  selected.includes(m.uid) ? 'text-blue-400 bg-blue-500/10' : 'text-muted hover:bg-card-bg'
                 }`}
               >
                 <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                  selected.includes(m.uid) ? 'bg-blue-600 border-blue-600' : 'border-gray-500'
+                  selected.includes(m.uid) ? 'bg-blue-600 border-blue-600' : 'border-card-border'
                 }`}>
                   {selected.includes(m.uid) && (
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -141,11 +141,11 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4">
-      <div className="w-full max-w-lg bg-gray-800 rounded-xl overflow-hidden">
+      <div className="w-full max-w-lg bg-card-bg rounded-xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h2 className="text-base font-semibold text-white">New Side Bet</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">×</button>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-card-border">
+          <h2 className="text-base font-semibold text-brand">New Side Bet</h2>
+          <button onClick={onClose} className="text-muted hover:text-brand text-xl leading-none">×</button>
         </div>
 
         <div className="overflow-y-auto max-h-[75vh] p-4 flex flex-col gap-5">
@@ -163,22 +163,22 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
           />
 
           {isStub && (
-            <p className="text-sm text-gray-500 text-center py-2">This bet type is coming soon.</p>
+            <p className="text-sm text-muted text-center py-2">This bet type is coming soon.</p>
           )}
 
           {!isStub && (
             <>
               {/* Visibility toggle */}
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-gray-300">Visibility</span>
-                <div className="flex rounded-lg overflow-hidden border border-gray-600">
+                <span className="text-sm font-medium text-muted">Visibility</span>
+                <div className="flex rounded-lg overflow-hidden border border-card-border">
                   <button
                     type="button"
                     onClick={() => setIsPublic(false)}
                     className={`flex-1 py-2 text-sm font-medium transition-colors ${
                       !isPublic
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-400 hover:text-gray-200'
+                        : 'bg-btn-secondary text-muted hover:text-brand'
                     }`}
                   >
                     Private
@@ -189,13 +189,13 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
                     className={`flex-1 py-2 text-sm font-medium transition-colors ${
                       isPublic
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-400 hover:text-gray-200'
+                        : 'bg-btn-secondary text-muted hover:text-brand'
                     }`}
                   >
                     Public
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 px-1">
+                <p className="text-xs text-muted px-1">
                   {isPublic
                     ? 'Anyone in the round can join this bet.'
                     : 'Only people you invite can join this bet.'}
@@ -204,7 +204,7 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
 
               {/* Invite players */}
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-gray-300">
+                <span className="text-sm font-medium text-muted">
                   {isPublic ? 'Pre-invite Players (optional)' : 'Invite Players'}
                 </span>
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
@@ -231,7 +231,7 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
                   onChange={(e) => setWager(e.target.value)}
                   placeholder="e.g. 5"
                 />
-                <p className="text-xs text-gray-500 px-1">
+                <p className="text-xs text-muted px-1">
                   Each loser pays each winner ${wager || 'X'}. Winners collect from every other participant.
                 </p>
               </div>

@@ -1,142 +1,202 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { useTeeSheetCombined } from '@/hooks/useTeeSheetCombined'
-import { useAuth } from '@/hooks/useAuth'
-import { userService } from '@/services/userService'
-import { RoundCard } from '@/components/round/RoundCard'
-import { EventCard } from '@/components/round/EventCard'
-import { Spinner } from '@/components/ui'
-import { getDocs, collection } from 'firebase/firestore'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import type { Group, UserProfile } from '@/types'
+import { useEvent } from '@/hooks/useEvent'
+import { useAuth } from '@/hooks/useAuth'
+import { useMyRounds } from '@/hooks/useMyRounds'
+import { Spinner, Card } from '@/components/ui'
+import { formatDate } from '@/lib/formatters'
+import { USBROPEN_EVENT_ID } from '@/config/usbropen'
+import type { Round } from '@/types'
+
+function useBropenRounds(eventId: string) {
+    const [rounds, setRounds] = useState<Round[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (!eventId) {
+            setLoading(false)
+            return
+        }
+        const q = query(collection(db, 'rounds'), where('eventId', '==', eventId))
+        const unsub = onSnapshot(q, (snap) => {
+            const data = snap.docs.map((d) => ({ roundId: d.id, ...d.data() }) as Round)
+            setRounds(data)
+            setLoading(false)
+        })
+        return unsub
+    }, [eventId])
+
+    return { rounds, loading }
+}
+
+function useMyGroup(roundId: string | undefined, userId: string | undefined) {
+    const [groupId, setGroupId] = useState<string | null>(null)
+    const [groupLoading, setGroupLoading] = useState(false)
+
+    useEffect(() => {
+        if (!roundId || !userId) return
+        setGroupLoading(true)
+        const q = query(collection(db, 'rounds', roundId, 'groups'), where('golferIds', 'array-contains', userId))
+        const unsub = onSnapshot(q, (snap) => {
+            setGroupId(snap.empty ? null : snap.docs[0].id)
+            setGroupLoading(false)
+        }, (err) => {
+            console.error('[useMyGroup] error:', err)
+            setGroupLoading(false)
+        })
+        return unsub
+    }, [roundId, userId])
+
+    return { groupId, groupLoading }
+}
 
 export function TeeSheetPage() {
-  const { rounds, events, loading: listLoading } = useTeeSheetCombined()
-  const { currentUser, loading: authLoading } = useAuth()
-  const uid = currentUser?.uid ?? ''
+    const { currentUser, loading: authLoading } = useAuth()
+    const { event, loading: eventLoading } = useEvent(USBROPEN_EVENT_ID)
+    const { rounds } = useBropenRounds(USBROPEN_EVENT_ID)
+    const { rounds: myRounds } = useMyRounds(currentUser?.uid ?? '')
 
-  // groupId lookup for standalone rounds the user has joined
-  const [groupLinks, setGroupLinks] = useState<Record<string, string>>({})
-  const [hostProfiles, setHostProfiles] = useState<Record<string, UserProfile>>({})
-
-  useEffect(() => {
-    if (rounds.length === 0) return
-    const creatorIds = [...new Set(rounds.map((r) => r.createdBy))]
-    Promise.all(creatorIds.map((id) => userService.getProfile(id).then((p) => ({ id, p }))))
-      .then((results) => {
-        const map: Record<string, UserProfile> = {}
-        for (const { id, p } of results) { if (p) map[id] = p }
-        setHostProfiles(map)
-      })
-  }, [rounds])
-
-  useEffect(() => {
-    if (!uid || rounds.length === 0) return
-    const standaloneJoined = rounds.filter((r) => !r.eventId && r.memberIds?.includes(uid))
-    if (standaloneJoined.length === 0) return
-
-    Promise.all(
-      standaloneJoined.map(async (r) => {
-        const snap = await getDocs(collection(db, 'rounds', r.roundId, 'groups'))
-        const groups = snap.docs.map((d) => ({ groupId: d.id, ...d.data() } as Group))
-        const myGroup = groups.find((g) => g.golferIds.includes(uid))
-        return myGroup ? { roundId: r.roundId, groupId: myGroup.groupId } : null
-      })
-    ).then((results) => {
-      const map: Record<string, string> = {}
-      for (const res of results) {
-        if (res) map[res.roundId] = res.groupId
-      }
-      setGroupLinks(map)
-    })
-  }, [uid, rounds])
-
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner size="lg" />
-      </div>
+    const activeStandaloneRounds = myRounds.filter(
+        (r) => !r.eventId && (r.status === 'active' || r.status === 'pending')
     )
-  }
 
-  if (!currentUser) {
+    const loading = authLoading || eventLoading
+
+    const activeRound = currentUser && event && event.memberIds?.includes(currentUser.uid)
+        ? rounds.find((r) => r.status === 'active')
+        : undefined
+
+    const { groupId: myGroupId, groupLoading } = useMyGroup(activeRound?.roundId, currentUser?.uid)
+
+    // Compute display date: range from earliest to latest round, or event date
+    const dateDisplay = (() => {
+        if (rounds.length === 0 || !event) return event ? formatDate(event.date) : null
+
+        const sorted = [...rounds].sort((a, b) => a.date.seconds - b.date.seconds)
+        const first = formatDate(sorted[0].date)
+        const last = formatDate(sorted[sorted.length - 1].date)
+        return first === last ? first : `${first} – ${last}`
+    })()
+
+    if (authLoading) {
+        return (
+            <div className="flex items-center justify-center py-24">
+                <Spinner size="lg" />
+            </div>
+        )
+    }
+
     return (
-      <div className="flex flex-col items-center justify-center gap-6 py-16 relative overflow-hidden">
-        <h1 className="text-2xl font-black text-white text-center relative z-10">Welcome to the Teesheet</h1>
-        <div className="flex gap-3 w-full relative z-10">
-          <Link
-            to="/register"
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
-          >
-            Register Free
-          </Link>
-          <Link
-            to="/login"
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
-          >
-            Sign In
-          </Link>
-        </div>
-        <img
-          src="/src/images/Icon.svg"
-          alt=""
-          aria-hidden="true"
-          className="w-[360px] opacity-20 pointer-events-none select-none"
-        />
-      </div>
+        <div className="flex flex-col gap-6">
+            {/* Event info */}
+            {loading ? (
+                <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+            ) : event ? (
+                <div className="flex flex-col gap-4 pt-2">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold text-brand">{event.name}</h1>
+                        {dateDisplay && (
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-danger">{dateDisplay}</p>
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 rounded-full px-2.5 py-0.5">
+                                    {event.memberIds.length}
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                                    </svg>
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    {event.description && (
+                        <p className="text-sm text-brand leading-relaxed">{event.description}</p>
+                    )}
+                </div>
+            ) : (
+                <div className="text-center py-16 text-muted">Event not found.</div>
+            )}
+
+            {/* Open Event */}
+            <Link
+                to={`/events/${USBROPEN_EVENT_ID}`}
+                className="bg-brand hover:bg-brand-hover text-white text-center py-3 rounded-xl font-semibold transition-colors"
+            >
+                Event Details
+            </Link>
+
+            {/* Active round callout */}
+            {activeRound && (
+                <Link
+                    to={!groupLoading && myGroupId
+                        ? `/rounds/${activeRound.roundId}/groups/${myGroupId}/scorecard`
+                        : `/rounds/${activeRound.roundId}`}
+                    className="block"
+                >
+                    <div className="rounded-xl p-4 flex flex-col gap-2" style={{ backgroundColor: '#3A6280' }}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white/70 uppercase tracking-wide">Current Round</span>
+                            <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold text-white">
+                                Active
+                            </span>
+                        </div>
+                        <p className="text-white font-bold text-lg leading-tight">{activeRound.name}</p>
+                        <p className="text-white/70 text-sm">{activeRound.courseName} · {activeRound.teeName}</p>
+                        <div className="mt-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-center py-2.5 rounded-lg font-semibold text-sm">
+                            {groupLoading ? 'Loading…' : 'Go To Round'}
+                        </div>
+                    </div>
+                </Link>
+            )}
+
+            {/* Handicap tracking CTA */}
+            <Card className="p-6 flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                    <h2 className="text-lg font-bold text-brand">Prepare - Track Your Handicap</h2>
+                    <p className="text-sm">
+                        We use handicap index to build the balanced teams for our matches. For those that do not have a GHIN (handicap index), the US Bropen app enables you to use an electronic scorecard to track your rounds leading up to the trip, to get a handicap.
+                    </p>
+                    <br />
+                    <p className="text-sm text-muted">
+
+                        You can create a full round, search &gt; find &gt; load your course, and invite your friends to use the full scoring function, or simply add a score after your round is over.  Clicking on your avatar initials in the top-right of the app will let you see your handicap and scores in your "My Scores" page.
+                    </p>
+                    <br />
+                </div>
+                <Link
+                    to="/rounds/new"
+                    className="bg-brand hover:bg-brand-hover text-white text-center py-3 rounded-xl font-semibold transition-colors"
+                >
+                    Create Round or Enter Score
+                </Link>
+            </Card >
+
+            {/* Active standalone rounds */}
+            {
+                activeStandaloneRounds.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">My Active Rounds</h2>
+                        {activeStandaloneRounds.map((r) => (
+                            <Link key={r.roundId} to={`/rounds/${r.roundId}`} className="block">
+                                <div className="rounded-xl p-4 flex flex-col gap-2" style={{ backgroundColor: '#3A6280' }}>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-white/70 uppercase tracking-wide">Round in Progress</span>
+                                        <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold text-white">
+                                            Active
+                                        </span>
+                                    </div>
+                                    <p className="text-white font-bold text-lg leading-tight">{r.name}</p>
+                                    <p className="text-white/70 text-sm">{r.courseName} · {r.teeName}</p>
+                                    <div className="mt-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-center py-2.5 rounded-lg font-semibold text-sm">
+                                        Go To Round
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                )
+            }
+        </div >
     )
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      {/* CTAs */}
-      <div className="flex gap-3">
-        <Link
-          to="/rounds/new/full"
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
-        >
-          Start Round
-        </Link>
-        <Link
-          to="/rounds/new/score"
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-3 rounded-xl font-semibold transition-colors"
-        >
-          Enter Score
-        </Link>
-      </div>
-
-      {/* List */}
-      <h2 className="text-2xl font-black text-white">The TeeSheet</h2>
-      {listLoading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : rounds.length === 0 && events.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="font-medium text-gray-400">No upcoming rounds or events</p>
-          <p className="text-sm text-gray-500 mt-1">Create one to get started.</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {events.map((e) => (
-            <EventCard key={e.eventId} event={e} currentUserId={uid} />
-          ))}
-          {rounds.map((r) => {
-            const groupId = groupLinks[r.roundId]
-            const linkTo = !r.eventId && groupId
-              ? `/rounds/${r.roundId}/groups/${groupId}`
-              : undefined
-            return (
-              <RoundCard
-                key={r.roundId}
-                round={r}
-                currentUserId={uid}
-                showStatus
-                linkTo={linkTo}
-                hostName={r.createdBy === uid ? 'You' : (hostProfiles[r.createdBy]?.displayName ?? '…')}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
 }

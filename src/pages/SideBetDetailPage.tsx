@@ -131,7 +131,7 @@ export function SideBetDetailPage() {
         >
           {backLabel}
         </button>
-        <p className="text-gray-400 text-center py-8">Bet not found.</p>
+        <p className="text-muted text-center py-8">Bet not found.</p>
       </div>
     )
   }
@@ -179,24 +179,24 @@ export function SideBetDetailPage() {
 
   function standingBlock() {
     if (b.status === 'cancelled') {
-      return <p className="text-sm text-gray-500 italic">This bet was cancelled.</p>
+      return <p className="text-sm text-muted italic">This bet was cancelled.</p>
     }
 
     if (b.status === 'pending') {
       if (b.invitedIds.length > 0) {
         return (
-          <p className="text-sm text-gray-400 italic">
+          <p className="text-sm text-muted italic">
             Waiting on: {b.invitedIds.map(getName).join(', ')}
           </p>
         )
       }
-      return <p className="text-sm text-gray-400 italic">Bet is open — waiting for round to begin.</p>
+      return <p className="text-sm text-muted italic">Bet is open — waiting for round to begin.</p>
     }
 
     if (b.status === 'settled') {
       const winners = b.winnersIds ?? []
       if (winners.length === 0) {
-        return <p className="text-base font-semibold text-gray-300">🤝 Complete tie — no money changes hands</p>
+        return <p className="text-base font-semibold text-brand">🤝 Complete tie — no money changes hands</p>
       }
       const pot = b.participantIds.length * b.wagerPerPerson
       const eachWinnerCollects = pot / winners.length
@@ -205,15 +205,15 @@ export function SideBetDetailPage() {
           <p className="text-base font-semibold text-blue-400">
             🏆 {winners.map(getName).join(' & ')} won
           </p>
-          <p className="text-sm text-gray-400">
-            Pot: <span className="text-white font-medium">${pot.toFixed(2)}</span>
+          <p className="text-sm text-muted">
+            Pot: <span className="text-brand font-medium">${pot.toFixed(2)}</span>
             {' '}({b.participantIds.length} × ${b.wagerPerPerson.toFixed(2)})
           </p>
-          <p className="text-sm text-gray-400">
-            Each winner collects <span className="text-white font-medium">${eachWinnerCollects.toFixed(2)}</span>
+          <p className="text-sm text-muted">
+            Each winner collects <span className="text-brand font-medium">${eachWinnerCollects.toFixed(2)}</span>
           </p>
-          <p className="text-sm text-gray-400">
-            Each loser paid in <span className="text-white font-medium">${b.wagerPerPerson.toFixed(2)}</span>
+          <p className="text-sm text-muted">
+            Each loser paid in <span className="text-brand font-medium">${b.wagerPerPerson.toFixed(2)}</span>
           </p>
         </div>
       )
@@ -221,7 +221,7 @@ export function SideBetDetailPage() {
 
     // Active — live standing
     if (!leader || leader.total === null) {
-      return <p className="text-sm text-gray-400 italic">No scores yet</p>
+      return <p className="text-sm text-muted italic">No scores yet</p>
     }
 
     return (
@@ -231,18 +231,18 @@ export function SideBetDetailPage() {
           const behind = r.total !== null && leader.total !== null ? r.total - leader.total : null
           return (
             <div key={r.id} className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-4">{r.total !== null ? i + 1 : '—'}</span>
-              <span className={`text-sm font-medium ${isLeading ? 'text-blue-300' : 'text-gray-300'}`}>
+              <span className="text-xs text-muted w-4">{r.total !== null ? i + 1 : '—'}</span>
+              <span className={`text-sm font-medium ${isLeading ? 'text-blue-300' : 'text-brand'}`}>
                 {getName(r.id)}
               </span>
               {r.total !== null ? (
-                <span className="text-xs text-gray-500 ml-auto">
+                <span className="text-xs text-muted ml-auto">
                   {r.total} {useNet ? 'net' : 'gross'}
                   {behind !== null && behind > 0 && ` (+${behind})`}
                   {' '}· {r.holes}/18
                 </span>
               ) : (
-                <span className="text-xs text-gray-600 ml-auto">No scores</span>
+                <span className="text-xs text-muted ml-auto">No scores</span>
               )}
             </div>
           )
@@ -273,17 +273,17 @@ export function SideBetDetailPage() {
       </div>
 
       {/* Bet info */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-1">
-        <p className="text-base font-semibold text-white">{BET_TYPE_LABELS[b.type]}</p>
-        <p className="text-sm text-gray-400">
-          ${b.wagerPerPerson.toFixed(2)} <span className="text-gray-500">/ person · everyone vs everyone</span>
+      <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-1">
+        <p className="text-base font-semibold text-brand">{BET_TYPE_LABELS[b.type]}</p>
+        <p className="text-sm text-muted">
+          ${b.wagerPerPerson.toFixed(2)} <span className="text-muted">/ person · everyone vs everyone</span>
         </p>
       </div>
 
       {/* Scores */}
       {(b.status === 'active' || b.status === 'settled') && (
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scores</h2>
+        <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-3">
+          <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Scores</h2>
           <div className="flex flex-col">
             {ranked.map((r) => {
               const sc = scores[r.id]
@@ -293,31 +293,31 @@ export function SideBetDetailPage() {
               return (
                 <div
                   key={r.id}
-                  className="flex items-center justify-between py-2.5 border-b border-gray-700 last:border-0"
+                  className="flex items-center justify-between py-2.5 border-b border-card-border last:border-0"
                 >
                   <div className="flex items-center gap-2">
                     {isWinner && <span className="text-xs">🏆</span>}
-                    <span className={`text-sm font-medium ${isWinner ? 'text-blue-300' : 'text-white'}`}>
+                    <span className={`text-sm font-medium ${isWinner ? 'text-blue-300' : 'text-brand'}`}>
                       {getName(r.id)}
                     </span>
-                    <span className="text-xs text-gray-500">({r.holes}/18)</span>
+                    <span className="text-xs text-muted">({r.holes}/18)</span>
                   </div>
                   <div className="flex gap-4">
                     {r.holes > 0 ? (
                       <>
                         <div className="text-center">
-                          <p className="text-xs text-gray-500">Gross</p>
-                          <p className={`text-sm font-bold ${isWinner && !useNet ? 'text-blue-300' : 'text-white'}`}>{gross}</p>
+                          <p className="text-xs text-muted">Gross</p>
+                          <p className={`text-sm font-bold ${isWinner && !useNet ? 'text-blue-300' : 'text-brand'}`}>{gross}</p>
                         </div>
                         {useNet && (
                           <div className="text-center">
-                            <p className="text-xs text-gray-500">Net</p>
+                            <p className="text-xs text-muted">Net</p>
                             <p className={`text-sm font-bold ${isWinner ? 'text-blue-300' : 'text-blue-400'}`}>{net}</p>
                           </div>
                         )}
                       </>
                     ) : (
-                      <span className="text-sm text-gray-600">No scores</span>
+                      <span className="text-sm text-muted">No scores</span>
                     )}
                   </div>
                 </div>
@@ -328,12 +328,12 @@ export function SideBetDetailPage() {
       )}
 
       {/* Standing */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-2">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Standing</h2>
+      <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-2">
+        <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Standing</h2>
         {standingBlock()}
       </div>
 
-      {actionError && <p className="text-sm text-red-400">{actionError}</p>}
+      {actionError && <p className="text-sm text-danger">{actionError}</p>}
 
       {/* Actions */}
       {(canAccept || canDecline || canJoin || canCancel) && (
@@ -351,7 +351,7 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleDecline}
-              className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold transition-colors border border-gray-600"
+              className="flex-1 py-3 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors border border-card-border"
             >
               Decline
             </button>
@@ -369,7 +369,7 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleCancel}
-              className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold transition-colors border border-gray-600"
+              className="flex-1 py-3 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors border border-card-border"
             >
               Cancel Bet
             </button>

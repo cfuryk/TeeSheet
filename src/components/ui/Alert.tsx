@@ -4,9 +4,9 @@ interface Props {
 }
 
 const typeClasses = {
-  error: 'bg-red-900/50 text-red-300 border-red-700',
-  success: 'bg-green-900/50 text-green-300 border-green-700',
-  info: 'bg-blue-900/50 text-blue-300 border-blue-700',
+  error: 'bg-red-50 text-danger border-red-200',
+  success: 'bg-brand/10 text-brand border-brand/20',
+  info: 'bg-blue-50 text-blue-700 border-blue-200',
 }
 
 export function Alert({ message, type = 'error' }: Props) {

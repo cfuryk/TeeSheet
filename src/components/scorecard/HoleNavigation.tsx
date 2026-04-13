@@ -3,26 +3,39 @@ interface Props {
   totalHoles: number
   onPrev: () => void
   onNext: () => void
+  allScored?: boolean
+  onReview?: () => void
 }
 
-export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext }: Props) {
+export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allScored, onReview }: Props) {
+  const onLast = currentHole === totalHoles
+  const showReview = allScored && onLast
+
   return (
     <div className="flex items-center justify-between">
       <button
         onClick={onPrev}
         disabled={currentHole === 1}
-        className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 border border-gray-600 font-semibold text-gray-300 disabled:opacity-30"
+        className="px-4 py-2 rounded-lg bg-btn-secondary hover:bg-card-bg border border-card-border font-semibold text-muted disabled:opacity-30"
       >
         ← Prev
       </button>
-      <span className="text-sm text-gray-400">Hole {currentHole} of {totalHoles}</span>
-      <button
-        onClick={onNext}
-        disabled={currentHole === totalHoles}
-        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 border border-green-600 font-semibold text-white disabled:opacity-30"
-      >
-        Next →
-      </button>
+      {showReview ? (
+        <button
+          onClick={onReview}
+          className="px-4 py-2 rounded-lg bg-danger hover:bg-danger/90 font-semibold text-white"
+        >
+          Review Round
+        </button>
+      ) : (
+        <button
+          onClick={onNext}
+          disabled={onLast}
+          className="px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover border border-brand font-semibold text-white disabled:opacity-30"
+        >
+          Next →
+        </button>
+      )}
     </div>
   )
 }

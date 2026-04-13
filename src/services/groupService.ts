@@ -19,8 +19,6 @@ import { roundService } from './roundService'
 import { calculateCourseHandicap, buildStrokeAllocation } from '@/lib/handicap'
 import { golferScoreService } from './golferScoreService'
 import { sideBetService } from './sideBetService'
-import { notificationService } from './notificationService'
-
 function groupsPath(roundId: string) {
   return collection(db, 'rounds', roundId, 'groups')
 }
@@ -53,7 +51,7 @@ export const groupService = {
     return ref.id
   },
 
-  async addGolferToGroup(roundId: string, groupId: string, golferId: string, roundName?: string): Promise<void> {
+  async addGolferToGroup(roundId: string, groupId: string, golferId: string): Promise<void> {
     const batch = writeBatch(db)
     batch.update(groupDocPath(roundId, groupId), {
       golferIds: arrayUnion(golferId),
@@ -66,12 +64,6 @@ export const groupService = {
     await batch.commit()
     // Track on user profile for My Rounds queries
     await userService.addParticipantRoundId(golferId, roundId)
-    void notificationService.createNotification(golferId, {
-      type: 'round_invite',
-      title: 'You were added to a round',
-      body: roundName ?? 'A round',
-      roundId,
-    })
   },
 
   async getGroup(roundId: string, groupId: string): Promise<Group | null> {
@@ -104,6 +96,72 @@ export const groupService = {
     })
   },
 
+  /**
+   * Distribute all memberIds of a round into groups of 4, creating new groups
+   * as needed. The creator is placed in the first group (already created).
+   * Called after cascading event members to a new round.
+   */
+  async fillGroupsFromMembers(roundId: string, memberIds: string[], _creatorId: string): Promise<void> {
+    if (memberIds.length === 0) return
+
+    // Fetch existing groups
+    const existingSnap = await getDocs(groupsPath(roundId))
+    const existing = existingSnap.docs.map((d) => ({ groupId: d.id, ...d.data() }) as Group)
+
+    // Build mutable buckets from existing groups
+    const groupBuckets: { groupId: string; members: string[] }[] = existing.map((g) => ({
+      groupId: g.groupId,
+      members: [...g.golferIds],
+    }))
+
+    // Determine who still needs a slot
+    const alreadyPlaced = new Set(groupBuckets.flatMap((b) => b.members))
+    const toPlace = memberIds.filter((uid) => !alreadyPlaced.has(uid))
+
+    if (toPlace.length === 0) return
+
+    let newGroupIndex = existing.length + 1
+
+    for (const uid of toPlace) {
+      const bucket = groupBuckets.find((b) => b.members.length < 4)
+      if (bucket) {
+        bucket.members.push(uid)
+      } else {
+        // Create a new group document
+        const name = `Group ${newGroupIndex++}`
+        const ref = await addDoc(groupsPath(roundId), {
+          roundId,
+          name,
+          golferIds: [uid],
+          teams: null,
+          groupAdminId: uid,
+          status: 'pending' as GroupStatus,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+        await updateDoc(ref, { groupId: ref.id })
+        await updateDoc(doc(db, 'rounds', roundId), {
+          groupIds: arrayUnion(ref.id),
+          updatedAt: serverTimestamp(),
+        })
+        groupBuckets.push({ groupId: ref.id, members: [uid] })
+      }
+    }
+
+    // Persist updated golferIds for existing buckets that changed
+    const batch = writeBatch(db)
+    for (const bucket of groupBuckets) {
+      const orig = existing.find((g) => g.groupId === bucket.groupId)
+      if (orig && orig.golferIds.length !== bucket.members.length) {
+        batch.update(groupDocPath(roundId, bucket.groupId), {
+          golferIds: bucket.members,
+          updatedAt: serverTimestamp(),
+        })
+      }
+    }
+    await batch.commit()
+  },
+
   async moveGolfer(roundId: string, fromGroupId: string, toGroupId: string, golferId: string): Promise<void> {
     const batch = writeBatch(db)
     batch.update(groupDocPath(roundId, fromGroupId), {
@@ -112,6 +170,35 @@ export const groupService = {
     })
     batch.update(groupDocPath(roundId, toGroupId), {
       golferIds: arrayUnion(golferId),
+      updatedAt: serverTimestamp(),
+    })
+    await batch.commit()
+  },
+
+  async swapGolfers(
+    roundId: string,
+    golferA: { golferId: string; groupId: string },
+    golferB: { golferId: string; groupId: string },
+  ): Promise<void> {
+    if (golferA.groupId === golferB.groupId) return
+    // Fetch both groups to get current golferIds arrays
+    const [snapA, snapB] = await Promise.all([
+      getDoc(groupDocPath(roundId, golferA.groupId)),
+      getDoc(groupDocPath(roundId, golferB.groupId)),
+    ])
+    if (!snapA.exists() || !snapB.exists()) return
+    const idsA: string[] = snapA.data().golferIds ?? []
+    const idsB: string[] = snapB.data().golferIds ?? []
+    // Build new arrays: replace A with B in groupA, replace B with A in groupB
+    const newIdsA = idsA.map((id) => (id === golferA.golferId ? golferB.golferId : id))
+    const newIdsB = idsB.map((id) => (id === golferB.golferId ? golferA.golferId : id))
+    const batch = writeBatch(db)
+    batch.update(groupDocPath(roundId, golferA.groupId), {
+      golferIds: newIdsA,
+      updatedAt: serverTimestamp(),
+    })
+    batch.update(groupDocPath(roundId, golferB.groupId), {
+      golferIds: newIdsB,
       updatedAt: serverTimestamp(),
     })
     await batch.commit()
@@ -303,7 +390,7 @@ export const groupService = {
                 })
                 break
               }
-              userService.recalculateHandicap(uid)
+              await userService.recalculateHandicap(uid)
             }
           }
         }

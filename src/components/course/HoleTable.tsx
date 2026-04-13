@@ -29,7 +29,7 @@ export function HoleTable({ fields, register, errors }: Props) {
                   min={3}
                   max={5}
                   {...register(`holes.${index}.par`, { valueAsNumber: true })}
-                  className="w-full text-center rounded border border-gray-200 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="w-full text-center rounded border border-gray-200 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
                 />
               </td>
               <td className="p-1 border border-gray-200">
@@ -38,7 +38,7 @@ export function HoleTable({ fields, register, errors }: Props) {
                   min={50}
                   max={700}
                   {...register(`holes.${index}.yardage`, { valueAsNumber: true })}
-                  className="w-full text-center rounded border border-gray-200 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="w-full text-center rounded border border-gray-200 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
                 />
               </td>
               <td className="p-1 border border-gray-200">
@@ -47,7 +47,7 @@ export function HoleTable({ fields, register, errors }: Props) {
                   min={1}
                   max={18}
                   {...register(`holes.${index}.handicap`, { valueAsNumber: true })}
-                  className="w-full text-center rounded border border-gray-200 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="w-full text-center rounded border border-gray-200 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
                 />
               </td>
             </tr>

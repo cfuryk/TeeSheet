@@ -12,13 +12,6 @@ import { CourseSelector } from '@/components/course/CourseSelector'
 import { localDateFromString } from '@/lib/formatters'
 import { useState } from 'react'
 
-const roundTypeOptions = [
-  { value: 'STROKE_GROSS', label: 'Stroke Play (Gross)' },
-  { value: 'STROKE_NET', label: 'Stroke Play (Net)' },
-  { value: 'BEST_BALL_GROSS', label: 'Best Ball (Gross) - 2v2' },
-  { value: 'BEST_BALL_NET', label: 'Best Ball (Net) - 2v2' },
-]
-
 export function EditRoundPage() {
   const { roundId } = useParams<{ roundId: string }>()
   const { round, loading } = useRound(roundId!)
@@ -41,7 +34,6 @@ export function EditRoundPage() {
       date: round.date.toDate().toISOString().slice(0, 10),
       roundType: round.roundType,
       isPrivate: round.isPrivate,
-      wager: round.wager ?? undefined,
     })
   }, [round, reset])
 
@@ -62,9 +54,9 @@ export function EditRoundPage() {
         teeId: data.teeId,
         teeName: tee?.name ?? round.teeName,
         date: Timestamp.fromDate(localDateFromString(data.date)),
-        roundType: data.roundType,
+        roundType: round.roundType,
         isPrivate: data.isPrivate,
-        wager: data.wager && data.wager > 0 ? data.wager : undefined,
+        wager: round.wager,
       })
       navigate(`/rounds/${round.roundId}`)
     } catch {
@@ -78,7 +70,7 @@ export function EditRoundPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-white">Edit Round</h2>
+      <h2 className="text-xl font-bold text-brand">Edit Round</h2>
       <Card className="p-4">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {error && <Alert message={error} />}
@@ -124,32 +116,10 @@ export function EditRoundPage() {
               />
             )}
           />
-          <Controller
-            name="roundType"
-            control={control}
-            render={({ field }) => (
-              <SelectField label="Round Type" options={roundTypeOptions} error={errors.roundType?.message} {...field} />
-            )}
-          />
-          <label className="flex items-center gap-2 text-sm text-gray-300">
+          <label className="flex items-center gap-2 text-sm text-brand">
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-300">Wager per Person (optional)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                {...register('wager')}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-7 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <p className="text-xs text-gray-500">Each player antes in. Winner(s) split the pot.</p>
-          </div>
           <div className="flex gap-2 mt-2">
             <Button type="submit" loading={isSubmitting} className="flex-1">
               Save Changes

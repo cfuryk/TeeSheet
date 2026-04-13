@@ -1,15 +1,22 @@
 import type { Score, Hole } from '@/types'
-import { Card } from '@/components/ui'
 import { scoreVsPar, bestBallHoleScore } from '@/lib/scoring'
+
+function shortName(full: string): string {
+  const parts = full.trim().split(/\s+/)
+  if (parts.length >= 2) return `${parts[0][0]}. ${parts[parts.length - 1]}`
+  if (parts.length === 1 && parts[0].length > 0) return parts[0]
+  return full
+}
 
 interface Props {
   scores: Score[]
   holes: Hole[]
   isNet: boolean
   showBestBall?: boolean
+  bare?: boolean
 }
 
-export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Props) {
+export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare = false }: Props) {
   const sorted = [...holes].sort((a, b) => a.number - b.number)
   const front = sorted.slice(0, 9)
   const back = sorted.slice(9, 18)
@@ -29,16 +36,16 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
     return (
       <table className="w-full text-xs border-collapse table-fixed">
         <thead>
-          <tr className="bg-gray-700">
-            <th className="p-2 text-left border border-gray-600 text-gray-300 w-10">Hole</th>
-            <th className="p-2 text-center border border-gray-600 text-gray-300 w-10">Par</th>
+          <tr className="bg-card-border">
+            <th className="p-2 text-left border border-card-border text-brand w-10">Hole</th>
+            <th className="p-2 text-center border border-card-border text-brand w-10">Par</th>
             {scores.map((sc) => (
-              <th key={sc.golferId} className="p-2 text-center border border-gray-600 text-gray-300 truncate">
-                {sc.golferName}
+              <th key={sc.golferId} className="p-2 text-center border border-card-border text-brand truncate">
+                {shortName(sc.golferName)}
               </th>
             ))}
             {showBestBall && (
-              <th className="p-2 text-center border border-gray-600 text-green-400 font-semibold">
+              <th className="p-2 text-center border border-card-border text-brand font-semibold">
                 Best Ball
               </th>
             )}
@@ -49,9 +56,9 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
             const bbScore = showBestBall ? bestBallHoleScore(scores, h.number, isNet) : null
             const bbVsPar = bbScore !== null ? scoreVsPar(bbScore, h.par) : null
             return (
-              <tr key={h.number} className="odd:bg-gray-800 even:bg-gray-750">
-                <td className="p-2 text-center border border-gray-600 font-medium text-gray-300">{h.number}</td>
-                <td className="p-2 text-center border border-gray-600 text-gray-500">{h.par}</td>
+              <tr key={h.number} className="odd:bg-card-bg even:bg-white h-10">
+                <td className="p-2 text-center border border-card-border font-medium text-brand">{h.number}</td>
+                <td className="p-2 text-center border border-card-border text-muted">{h.par}</td>
                 {scores.map((sc) => {
                   const s = getScore(sc, h.number)
                   const grossScore = s?.grossScore ?? null
@@ -61,9 +68,9 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
                   const holeIdx = h.number - 1
                   const strokes = sc.strokeAllocation?.[holeIdx] ?? 0
                   return (
-                    <td key={sc.golferId} className="relative p-2 text-center border border-gray-600">
+                    <td key={sc.golferId} className="relative py-1 px-0 text-center border border-card-border">
                       {isNet && strokes > 0 && (
-                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-green-400" />
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-brand" />
                       )}
                       <div className="flex items-center justify-center">
                         <ScoreBadge score={isNet && grossScore !== null ? grossScore : displayScore} vsPar={displayVp} />
@@ -72,7 +79,7 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
                   )
                 })}
                 {showBestBall && (
-                  <td className="p-2 text-center border border-gray-600 bg-green-500/5">
+                  <td className="py-1 px-0 text-center border border-card-border bg-brand/5">
                     <div className="flex items-center justify-center">
                       <ScoreBadge score={bbScore} vsPar={bbVsPar} />
                     </div>
@@ -82,18 +89,18 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
             )
           })}
           {/* Totals row */}
-          <tr className="bg-gray-700 font-bold">
-            <td className="p-2 text-center border border-gray-600 text-gray-300">{label}</td>
-            <td className="p-2 text-center border border-gray-600 text-gray-400">
+          <tr className="bg-card-border font-bold">
+            <td className="p-2 text-center border border-card-border text-brand">{label}</td>
+            <td className="p-2 text-center border border-card-border text-muted">
               {group.reduce((s, h) => s + h.par, 0)}
             </td>
             {scores.map((sc) => (
-              <td key={sc.golferId} className="p-2 text-center border border-gray-600 text-white">
+              <td key={sc.golferId} className="p-2 text-center border border-card-border text-brand">
                 {halfTotal(sc, group, 'gross')}
               </td>
             ))}
             {showBestBall && (
-              <td className="p-2 text-center border border-gray-600 text-green-400 bg-green-500/5">
+              <td className="p-2 text-center border border-card-border text-brand bg-brand/5">
                 {group.reduce((sum, h) => {
                   const bb = bestBallHoleScore(scores, h.number, isNet)
                   return sum + (bb ?? 0)
@@ -106,45 +113,91 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false }: Pr
     )
   }
 
+  function renderTotals() {
+    const totalPar = sorted.reduce((s, h) => s + h.par, 0)
+    return (
+      <table className="w-full text-xs border-collapse table-fixed">
+        <tbody>
+          <tr className="bg-card-border font-bold">
+            <td className="p-2 text-center border border-card-border text-brand w-10">TOT</td>
+            <td className="p-2 text-center border border-card-border text-muted w-10">{totalPar}</td>
+            {scores.map((sc) => {
+              const total = sc.scores.reduce((s, h) => s + h.grossScore, 0)
+              const vsPar = sc.scores.length > 0
+                ? sc.scores.reduce((sum, hs) => {
+                    const h = sorted.find((hole) => hole.number === hs.hole)
+                    return sum + (h ? hs.grossScore - h.par : 0)
+                  }, 0)
+                : null
+              return (
+                <td key={sc.golferId} className="p-2 text-center border border-card-border">
+                  {sc.scores.length > 0 ? (
+                    <span className={`font-bold ${vsPar !== null && vsPar < 0 ? 'text-danger' : vsPar !== null && vsPar > 0 ? 'text-[#3A6280]' : 'text-brand'}`}>
+                      {total}
+                    </span>
+                  ) : (
+                    <span className="text-muted">-</span>
+                  )}
+                </td>
+              )
+            })}
+            {showBestBall && <td className="p-2 text-center border border-card-border bg-brand/5" />}
+          </tr>
+        </tbody>
+      </table>
+    )
+  }
+
+  if (bare) {
+    return (
+      <div className="flex flex-col gap-4">
+        {renderGroup(front, 'OUT')}
+        {back.length > 0 && renderGroup(back, 'IN')}
+        {renderTotals()}
+      </div>
+    )
+  }
+
   return (
-    <Card className="p-4 flex flex-col gap-4">
-      <h3 className="font-semibold text-gray-300">Full Scorecard</h3>
+    <div className="p-4 flex flex-col gap-4">
+      <h3 className="font-semibold text-muted">Full Scorecard</h3>
       {renderGroup(front, 'OUT')}
       {back.length > 0 && renderGroup(back, 'IN')}
-    </Card>
+      {renderTotals()}
+    </div>
   )
 }
 
 function ScoreBadge({ score, vsPar }: { score: number | null; vsPar: number | null }) {
   if (score === null || vsPar === null) {
-    return <span className="font-mono text-gray-600">-</span>
+    return <span className="inline-flex items-center justify-center w-8 h-8 font-mono text-muted">-</span>
   }
   if (vsPar <= -2) {
     return (
-      <span className="inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-red-400 outline-offset-[-6px]">
+      <span className="inline-flex items-center justify-center w-6 h-6 font-mono font-semibold text-danger rounded-full ring-2 ring-danger ring-offset-[3px] ring-offset-white outline outline-2 outline-danger outline-offset-[-3px]">
         {score}
       </span>
     )
   }
   if (vsPar === -1) {
     return (
-      <span className="inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400">
+      <span className="inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-danger rounded-full ring-2 ring-danger">
         {score}
       </span>
     )
   }
   if (vsPar === 0) {
-    return <span className="inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-gray-200">{score}</span>
+    return <span className="inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-brand">{score}</span>
   }
   if (vsPar === 1) {
     return (
-      <span className="inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-blue-400 ring-2 ring-blue-400">
+      <span className="inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-[#3A6280] ring-2 ring-[#3A6280]">
         {score}
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-blue-400 outline-offset-[-6px]">
+    <span className="inline-flex items-center justify-center w-6 h-6 font-mono font-semibold text-[#3A6280] ring-2 ring-[#3A6280] ring-offset-[3px] ring-offset-white outline outline-2 outline-[#3A6280] outline-offset-[-3px]">
       {score}
     </span>
   )

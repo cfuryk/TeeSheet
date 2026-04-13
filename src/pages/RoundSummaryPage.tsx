@@ -15,6 +15,7 @@ import {
   matchPlayPoints,
   twoTeamAggregateScore,
   twoTeamBestBallAggregateScore,
+  buildLeaderboard,
 } from '@/lib/scoring'
 
 export function RoundSummaryPage() {
@@ -54,7 +55,18 @@ export function RoundSummaryPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
+      <button
+        type="button"
+        onClick={() => {
+          if (from === 'scorecard' && groupId) navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
+          else navigate(`/rounds/${roundId}`)
+        }}
+        className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white font-semibold py-3 rounded-xl transition-colors"
+      >
+        Back to Round
+      </button>
+
+      <h1 className="text-2xl font-bold text-brand">Leaderboard</h1>
 
       {scoringFormat === 'two_team'
         ? <TwoTeamLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
@@ -62,17 +74,6 @@ export function RoundSummaryPage() {
         ? <ScrambleLeaderboard groups={groups} allScores={allScores} tee={tee} roundId={roundId!} navigate={navigate} />
         : <IndividualLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
       }
-
-      <button
-        type="button"
-        onClick={() => {
-          if (from === 'scorecard' && groupId) navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
-          else navigate(`/rounds/${roundId}`)
-        }}
-        className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors"
-      >
-        {from === 'scorecard' ? 'Back to Scorecard' : 'Back to Round'}
-      </button>
     </div>
   )
 }
@@ -107,22 +108,22 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
 
     return (
       <Card className="p-4">
-        <h3 className="font-semibold text-gray-400 mb-3">Best Ball Leaderboard</h3>
+        <h3 className="font-semibold text-muted mb-3">Best Ball Leaderboard</h3>
         <div className="flex flex-col gap-2">
           {pairs.map((pair, i) => (
             <button
               key={pair.leadId}
               type="button"
               onClick={() => navigate(`/rounds/${roundId}/scorecard/${pair.leadId}`)}
-              className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+              className="flex items-center justify-between px-3 py-3 rounded-lg bg-card-bg hover:bg-card-bg transition-colors w-full text-left"
             >
               <span className="flex items-center gap-2 min-w-0">
-                <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
-                <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{pair.names}</span>
+                <span className="text-lg w-7 shrink-0 font-bold text-brand">{i + 1}.</span>
+                <span className="text-brand truncate">{pair.names}</span>
               </span>
               <span className="flex items-center gap-0 shrink-0 ml-3">
-                <span className="font-mono w-8 text-right text-white">{pair.total ?? '-'}</span>
-                <span className="font-mono w-14 text-right text-sm text-gray-400">{pair.vsPar !== null ? `(${formatVsPar(pair.vsPar)})` : ''}</span>
+                <span className="font-mono w-8 text-right text-brand">{pair.total ?? '-'}</span>
+                <span className="font-mono w-14 text-right text-sm text-muted">{pair.vsPar !== null ? `(${formatVsPar(pair.vsPar)})` : ''}</span>
               </span>
             </button>
           ))}
@@ -132,37 +133,39 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
   }
 
   // Stroke play
-  const leaderboard = [...allScores].sort((a, b) => {
-    const aScore = useNet ? (a.totalNet ?? 999) : (a.totalGross ?? 999)
-    const bScore = useNet ? (b.totalNet ?? 999) : (b.totalGross ?? 999)
-    return aScore - bScore
-  })
+  const leaderboard = buildLeaderboard(allScores, tee.holes, useNet)
 
   return (
     <Card className="p-4">
-      <h3 className="font-semibold text-gray-400 mb-3">Leaderboard</h3>
+      {/* Column headers */}
+      <div className="flex items-center justify-between px-3 mb-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <p className="text-xs text-muted uppercase tracking-wide w-7 shrink-0 text-center">Pos</p>
+          <p className="text-xs text-muted uppercase tracking-wide">Player</p>
+        </div>
+        <div className="flex gap-4 text-center shrink-0 ml-3">
+          <p className="text-xs text-muted uppercase tracking-wide w-10">Round</p>
+          <p className="text-xs text-muted uppercase tracking-wide w-10">Thru</p>
+          <p className="text-xs text-muted uppercase tracking-wide w-10">Total</p>
+        </div>
+      </div>
       <div className="flex flex-col gap-2">
-        {leaderboard.map((sc, i) => {
-          const holesPlayed = sc.scores.length
-          const finished = holesPlayed === 18
+        {leaderboard.map(({ score: sc, vsPar, holesPlayed, rankLabel }) => {
           const gross = sc.scores.reduce((s, h) => s + h.grossScore, 0)
           const net = sc.scores.reduce((s, h) => s + h.netScore, 0)
           const displayScore = holesPlayed > 0 ? (useNet ? net : gross) : null
-          const vsPar = useNet
-            ? calculateTotalNetVsPar(sc.scores, tee.holes)
-            : calculateTotalVsPar(sc.scores, tee.holes)
           return (
             <button
               key={sc.golferId}
               type="button"
               onClick={() => navigate(`/rounds/${roundId}/scorecard/${sc.golferId}`)}
-              className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+              className="flex items-center justify-between px-3 py-2 rounded-lg bg-card-bg hover:bg-card-bg transition-colors w-full text-left"
             >
-              <span className="flex items-center gap-2 min-w-0">
-                <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
-                <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{sc.golferName}</span>
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-xs w-7 shrink-0 font-bold text-muted text-center">{rankLabel}</span>
+                <span className="text-brand truncate text-sm font-semibold">{sc.golferName}</span>
               </span>
-              <ScoreStatus holesPlayed={holesPlayed} finished={finished} score={displayScore} vsPar={vsPar} />
+              <ScoreStatus holesPlayed={holesPlayed} isLocked={sc.isLocked} score={displayScore} vsPar={vsPar ?? 0} />
             </button>
           )
         })}
@@ -192,23 +195,24 @@ function ScrambleLeaderboard({ groups, allScores, tee, roundId, navigate }: {
 
   return (
     <Card className="p-4">
-      <h3 className="font-semibold text-gray-400 mb-3">Scramble Leaderboard</h3>
+      <h3 className="font-semibold text-muted mb-3">Scramble Leaderboard</h3>
       <div className="flex flex-col gap-2">
         {rows.map((row, i) => {
           const adminScore = allScores.find((s) => s.golferId === row.adminId)
           const holesPlayed = adminScore?.scores.length ?? 0
+          const isLocked = adminScore?.isLocked ?? false
           return (
           <button
             key={row.group.groupId}
             type="button"
             onClick={() => navigate(`/rounds/${roundId}/scorecard/${row.adminId}`)}
-            className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+            className="flex items-center justify-between px-3 py-3 rounded-lg bg-card-bg hover:bg-card-bg transition-colors w-full text-left"
           >
             <span className="flex items-center gap-2 min-w-0">
-              <span className="text-lg w-7 shrink-0 font-bold text-white">{i === 0 ? '🏆' : `${i + 1}.`}</span>
-              <span className={`truncate ${i === 0 ? 'font-bold text-green-400' : 'text-white'}`}>{row.group.name ?? `Group ${i + 1}`}</span>
+              <span className="text-lg w-7 shrink-0 font-bold text-brand">{i + 1}.</span>
+              <span className="text-brand truncate">{row.group.name ?? `Group ${i + 1}`}</span>
             </span>
-            <ScoreStatus holesPlayed={holesPlayed} finished={holesPlayed === 18} score={row.total} vsPar={row.vsPar ?? 0} />
+            <ScoreStatus holesPlayed={holesPlayed} isLocked={isLocked} score={row.total} vsPar={row.vsPar ?? 0} />
           </button>
           )
         })}
@@ -261,7 +265,7 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
         </div>
         <div className="flex flex-col gap-1">
           {groupResults.map((gr) => (
-            <div key={gr.name} className="flex items-center justify-between text-sm text-gray-400 px-1">
+            <div key={gr.name} className="flex items-center justify-between text-sm text-muted px-1">
               <span>{gr.name}</span>
               <span className="font-mono">A: {gr.aPoints} — B: {gr.bPoints}</span>
             </div>
@@ -300,7 +304,7 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
       {/* Per-team player lists */}
       {[{ label: 'Team A', scores: teamAScores }, { label: 'Team B', scores: teamBScores }].map(({ label, scores }) => (
         <Card key={label} className="p-4">
-          <h3 className="font-semibold text-gray-400 mb-3">{label}</h3>
+          <h3 className="font-semibold text-muted mb-3">{label}</h3>
           <div className="flex flex-col gap-2">
             {scores
               .sort((a, b) => ((useNet ? a.totalNet : a.totalGross) ?? 999) - ((useNet ? b.totalNet : b.totalGross) ?? 999))
@@ -310,15 +314,15 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
                     key={sc.golferId}
                     type="button"
                     onClick={() => navigate(`/rounds/${roundId}/scorecard/${sc.golferId}`)}
-                    className="flex items-center justify-between px-3 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors w-full text-left"
+                    className="flex items-center justify-between px-3 py-3 rounded-lg bg-card-bg hover:bg-card-bg transition-colors w-full text-left"
                   >
                     <span className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm text-white w-5 shrink-0">{i + 1}.</span>
-                      <span className="text-white truncate">{sc.golferName}</span>
+                      <span className="text-sm text-brand w-5 shrink-0">{i + 1}.</span>
+                      <span className="text-brand truncate">{sc.golferName}</span>
                     </span>
                     <ScoreStatus
                       holesPlayed={sc.scores.length}
-                      finished={sc.scores.length === 18}
+                      isLocked={sc.isLocked}
                       score={sc.scores.length > 0 ? (useNet ? sc.scores.reduce((s, h) => s + h.netScore, 0) : sc.scores.reduce((s, h) => s + h.grossScore, 0)) : null}
                       vsPar={useNet ? calculateTotalNetVsPar(sc.scores, tee.holes) : calculateTotalVsPar(sc.scores, tee.holes)}
                     />
@@ -340,18 +344,18 @@ function TeamScoreTile({ label, score, avg, points, winner }: {
   winner: boolean
 }) {
   return (
-    <div className={`flex-1 rounded-xl p-4 border-2 ${winner ? 'border-green-500 bg-green-500/10' : 'border-gray-600 bg-gray-700/50'}`}>
-      <div className={`text-sm font-semibold mb-1 ${winner ? 'text-green-400' : 'text-gray-400'}`}>
+    <div className={`flex-1 rounded-xl p-4 border-2 ${winner ? 'border-brand bg-brand/10' : 'border-card-border bg-card-bg'}`}>
+      <div className={`text-sm font-semibold mb-1 ${winner ? 'text-brand' : 'text-muted'}`}>
         {label} {winner ? '🏆' : ''}
       </div>
       {points !== undefined && (
-        <div className="text-2xl font-bold text-white">{points} pts</div>
+        <div className="text-2xl font-bold text-brand">{points} pts</div>
       )}
       {score !== undefined && (
         <>
-          <div className="text-2xl font-bold text-white">{score}</div>
+          <div className="text-2xl font-bold text-brand">{score}</div>
           {avg !== null && avg !== undefined && (
-            <div className="text-xs text-gray-500">avg {avg.toFixed(1)}</div>
+            <div className="text-xs text-muted">avg {avg.toFixed(1)}</div>
           )}
         </>
       )}
@@ -359,21 +363,21 @@ function TeamScoreTile({ label, score, avg, points, winner }: {
   )
 }
 
-function ScoreStatus({ holesPlayed, finished, score, vsPar }: {
+function ScoreStatus({ holesPlayed, isLocked, score, vsPar }: {
   holesPlayed: number
-  finished: boolean
+  isLocked: boolean
   score: number | null
   vsPar: number
 }) {
-  const holeLabel = finished ? 'F' : `${holesPlayed}`
-  const vsParColor = vsPar < 0 ? 'text-red-400' : vsPar > 0 ? 'text-blue-400' : 'text-gray-400'
+  const thru = (holesPlayed === 18 && isLocked) ? 'F' : holesPlayed > 0 ? `${holesPlayed}` : '-'
+  const vsParColor = vsPar < 0 ? 'text-danger' : vsPar > 0 ? 'text-[#3A6280]' : 'text-brand'
   return (
-    <span className="flex items-center gap-1 shrink-0 ml-3 font-mono text-sm">
-      <span className="text-gray-500">{holeLabel}</span>
-      <span className="text-gray-600">|</span>
-      <span className="text-white">{score ?? '-'}</span>
-      <span className="text-gray-600">|</span>
-      <span className={vsParColor}>{formatVsPar(vsPar)}</span>
-    </span>
+    <div className="flex gap-4 text-center shrink-0 ml-3">
+      <p className={`text-sm font-bold w-10 ${holesPlayed > 0 ? vsParColor : 'text-muted'}`}>
+        {holesPlayed > 0 ? formatVsPar(vsPar) : '-'}
+      </p>
+      <p className="text-sm font-bold text-brand w-10">{thru}</p>
+      <p className="text-sm font-bold text-brand w-10">{score ?? '-'}</p>
+    </div>
   )
 }

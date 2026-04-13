@@ -9,9 +9,9 @@ interface Props {
 export function ScorecardHeader({ round, currentHole, totalHoles }: Props) {
   return (
     <div className="flex items-center justify-between px-1">
-      <h1 className="text-xl font-bold text-white">{round.courseName}</h1>
+      <h1 className="text-xl font-bold text-brand">{round.courseName}</h1>
       {currentHole && totalHoles && (
-        <span className="text-sm bg-gray-700 rounded-full px-3 py-0.5 text-gray-300">
+        <span className="text-sm bg-brand/10 text-brand rounded-full px-3 py-0.5 font-semibold">
           Hole {currentHole}/{totalHoles}
         </span>
       )}

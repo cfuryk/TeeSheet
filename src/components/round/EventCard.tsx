@@ -17,18 +17,18 @@ const statusVariant: Record<GolfEvent['status'], 'yellow' | 'green' | 'gray'> = 
 export function EventCard({ event, currentUserId: _currentUserId }: Props) {
   return (
     <Link to={`/events/${event.eventId}`} className="block">
-      <Card className="p-4 hover:border-gray-500 transition-colors">
+      <Card className="p-4 hover:border-card-border transition-colors">
         <div className="flex items-start justify-between mb-2">
           <div className="min-w-0 flex-1 mr-3">
-            <p className="font-semibold text-white truncate">{event.name}</p>
+            <p className="font-semibold text-brand truncate">{event.name}</p>
             {event.description && (
-              <p className="text-sm text-gray-400 mt-0.5 truncate">{event.description}</p>
+              <p className="text-sm text-muted mt-0.5 truncate">{event.description}</p>
             )}
           </div>
           <Badge label={event.status} variant={statusVariant[event.status]} />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">{formatDate(event.date)}</span>
+          <span className="text-xs text-muted">{formatDate(event.date)}</span>
           <Badge label={event.type === 'single_round' ? 'Single Round' : 'Multi Round'} variant="gray" />
           {event.isPrivate && <Badge label="Private" variant="purple" />}
         </div>

@@ -7,19 +7,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        green: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
-          950: '#052e16',
-        },
+        brand: '#093b60',
+        'brand-hover': '#072e4c',
+        danger: '#d02030',
+        'danger-hover': '#a81926',
+        'card-bg': '#eeeeee',
+        'card-border': '#dedfe1',
+        'btn-secondary': '#D7DCE0',
+        'btn-secondary-hover': '#c8cdd2',
+        muted: '#6B7280',
       },
     },
   },

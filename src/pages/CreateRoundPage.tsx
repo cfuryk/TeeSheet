@@ -1,10 +1,11 @@
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useCourses } from '@/hooks/useCourses'
 import { roundService } from '@/services/roundService'
 import { groupService } from '@/services/groupService'
+import { eventService } from '@/services/eventService'
 import { roundFormSchema, RoundFormValues } from '@/schemas/roundSchemas'
 import { Input, Button, Alert, SelectField, Card, DateInput } from '@/components/ui'
 import { CourseSelector } from '@/components/course/CourseSelector'
@@ -14,6 +15,8 @@ export function CreateRoundPage() {
   const { currentUser, userProfile } = useAuth()
   const { courses } = useCourses()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const eventId = searchParams.get('eventId') ?? undefined
   const [error, setError] = useState('')
 
   const { register, handleSubmit, watch, control, setValue, formState: { errors, isSubmitting } } = useForm<RoundFormValues>({
@@ -27,8 +30,22 @@ export function CreateRoundPage() {
   })
 
   const selectedCourseId = watch('courseId')
-  const roundName = watch('name')
   const selectedCourse = courses.find((c) => c.courseId === selectedCourseId)
+
+  const namePlaceholder = (() => {
+    const options = [
+      'Weekend Warriors',
+      'A Game of Whack Fuck',
+      'Saturdays Are For the Boys',
+      'Edward Fore Tee Hands',
+      'Drunk Driver',
+      'The Mulligan Mafia',
+      'Fore Skins',
+      'Hazard Hunters',
+      'Glizzy Gobblers',
+    ]
+    return `Ex: ${options[Math.floor(Math.random() * options.length)]}`
+  })()
   const teeOptions = selectedCourse?.tees.map((t) => ({ value: t.teeId, label: t.name })) ?? []
 
   // Auto-fill round name from host name + course name whenever either changes,
@@ -37,9 +54,7 @@ export function CreateRoundPage() {
   useEffect(() => {
     if (!selectedCourse) return
     const generated = `${hostName} @ ${selectedCourse.name}`.trim()
-    if (!roundName || roundName === watch('name')) {
-      setValue('name', generated, { shouldValidate: false })
-    }
+    setValue('name', generated, { shouldValidate: false })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourseId, hostName])
 
@@ -54,30 +69,41 @@ export function CreateRoundPage() {
         currentUser.uid,
         course?.name ?? '',
         tee?.name ?? '',
+        eventId,
       )
-      const groupId = await groupService.createGroup(roundId, currentUser.uid)
-      navigate(`/rounds/${roundId}/groups/${groupId}`)
-    } catch {
+      if (eventId) {
+        await eventService.addRoundToEvent(eventId, roundId)
+        await eventService.cascadeEventMembersToRound(eventId, roundId)
+      }
+      // Create the creator's group first, then fill remaining members into groups of 4
+      await groupService.createGroup(roundId, currentUser.uid)
+      if (eventId) {
+        const event = await eventService.getEvent(eventId)
+        if (event && event.memberIds.length > 1) {
+          await groupService.fillGroupsFromMembers(roundId, event.memberIds, currentUser.uid)
+        }
+      }
+      navigate(`/rounds/${roundId}`)
+    } catch (e) {
+      console.error('createRound error:', e)
       setError('Failed to create round. Please try again.')
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-white">Start Round</h1>
+      <h1 className="text-2xl font-bold text-brand">Start Round</h1>
 
       {error && <Alert message={error} />}
 
       <Card className="p-4">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-          {roundName && (
-            <Input
+          <Input
               label="Round Name"
               {...register('name')}
               error={errors.name?.message}
-              placeholder="e.g. Saturday Morning"
+              placeholder={namePlaceholder}
             />
-          )}
 
           {/* Course */}
           <Controller
@@ -125,7 +151,7 @@ export function CreateRoundPage() {
             )}
           />
 
-          <label className="flex items-center gap-2 text-sm text-gray-300">
+          <label className="flex items-center gap-2 text-sm text-brand">
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>

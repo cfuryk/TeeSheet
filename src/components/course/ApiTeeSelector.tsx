@@ -20,7 +20,7 @@ export function ApiTeeSelector({ course, selectedTees, onToggle }: Props) {
     if (tees.length === 0) return null
     return (
       <div>
-        <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">{label}</p>
+        <p className="text-xs text-muted uppercase tracking-wide mb-2">{label}</p>
         <div className="flex flex-col gap-2">
           {tees.map((tee) => {
             const selected = isSelected(tee)
@@ -30,19 +30,19 @@ export function ApiTeeSelector({ course, selectedTees, onToggle }: Props) {
                 onClick={() => onToggle(tee)}
                 className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${
                   selected
-                    ? 'border-green-500 bg-green-900/20'
-                    : 'border-gray-700 bg-gray-800 hover:border-gray-500'
+                    ? 'border-brand bg-brand/10'
+                    : 'border-card-border bg-card-bg hover:border-card-border'
                 }`}
               >
                 <div>
-                  <p className="font-semibold text-white">{tee.tee_name}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="font-semibold text-brand">{tee.tee_name}</p>
+                  <p className="text-xs text-muted">
                     {tee.total_yards} yds · Par {tee.par_total}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-300">Rating {tee.course_rating}</p>
-                  <p className="text-xs text-gray-400">Slope {tee.slope_rating}</p>
+                  <p className="text-sm text-brand">Rating {tee.course_rating}</p>
+                  <p className="text-xs text-muted">Slope {tee.slope_rating}</p>
                 </div>
               </button>
             )
@@ -55,18 +55,18 @@ export function ApiTeeSelector({ course, selectedTees, onToggle }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="font-semibold text-white">{displayCourseName(course)}</p>
-        <p className="text-sm text-gray-400">
+        <p className="font-semibold text-brand">{displayCourseName(course)}</p>
+        <p className="text-sm text-muted">
           {[course.location.city, course.location.state].filter(Boolean).join(', ')}
         </p>
       </div>
-      <p className="text-sm text-gray-400">
+      <p className="text-sm text-muted">
         Select the tees you want to import ({allTees.length} available):
       </p>
       {renderGroup(maleTees, 'Men')}
       {renderGroup(femaleTees, 'Women')}
       {selectedTees.length > 0 && (
-        <p className="text-xs text-green-400">
+        <p className="text-xs text-brand">
           {selectedTees.length} tee set{selectedTees.length !== 1 ? 's' : ''} selected
         </p>
       )}

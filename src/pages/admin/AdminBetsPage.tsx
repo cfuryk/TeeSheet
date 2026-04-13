@@ -102,7 +102,7 @@ function MultiSelect<T extends string>({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-2 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 hover:border-gray-500 transition-colors"
+        className="w-full flex items-center justify-between gap-2 bg-card-bg border border-card-border rounded-lg px-3 py-2 text-sm text-brand hover:border-card-border transition-colors"
       >
         <span className="truncate">{displayText}</span>
         <svg className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -110,12 +110,12 @@ function MultiSelect<T extends string>({
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-20 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-card-border rounded-xl shadow-xl z-20 overflow-hidden">
           <button
             type="button"
             onClick={() => onChange([])}
             className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-              selected.length === 0 ? 'text-blue-400 bg-blue-500/10' : 'text-gray-400 hover:bg-gray-700'
+              selected.length === 0 ? 'text-blue-400 bg-blue-500/10' : 'text-muted hover:bg-card-bg'
             }`}
           >
             All {label}
@@ -126,7 +126,7 @@ function MultiSelect<T extends string>({
               type="button"
               onClick={() => toggle(opt)}
               className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-                selected.includes(opt) ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-700'
+                selected.includes(opt) ? 'text-blue-400 bg-blue-500/10' : 'text-brand hover:bg-card-bg'
               }`}
             >
               <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
@@ -255,7 +255,7 @@ export function AdminBetsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">Admin Bets</h2>
+        <h2 className="text-xl font-bold text-brand">Admin Bets</h2>
         <Button variant="primary" size="sm" onClick={() => navigate('/admin')}>Back</Button>
       </div>
 
@@ -281,7 +281,7 @@ export function AdminBetsPage() {
         <div className="flex justify-center py-12"><Spinner /></div>
       ) : filtered.length === 0 ? (
         <Card className="p-6 text-center">
-          <p className="text-gray-400">No bets match the current filters.</p>
+          <p className="text-muted">No bets match the current filters.</p>
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
@@ -301,12 +301,12 @@ export function AdminBetsPage() {
                 }
                 className="w-full text-left"
               >
-                <Card className="p-4 hover:border-gray-500 transition-colors flex flex-col gap-2.5">
+                <Card className="p-4 hover:border-card-border transition-colors flex flex-col gap-2.5">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-white">{bet.typeLabel}</p>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">{bet.roundName}</p>
+                      <p className="text-sm font-semibold text-brand">{bet.typeLabel}</p>
+                      <p className="text-xs text-muted truncate mt-0.5">{bet.roundName}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -327,8 +327,8 @@ export function AdminBetsPage() {
                         key={i}
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                           bet.winnersNames.includes(name)
-                            ? 'bg-green-500/20 text-green-300 ring-1 ring-green-500/50'
-                            : 'bg-gray-700 text-gray-300'
+                            ? 'bg-brand/10 text-brand ring-1 ring-brand/50'
+                            : 'bg-card-bg text-brand'
                         }`}
                       >
                         {name}
@@ -338,17 +338,17 @@ export function AdminBetsPage() {
 
                   {/* Footer */}
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       ${bet.wager.toFixed(2)} {bet.kind === 'round_wager' ? 'per player' : '/ person'}
                       {' · '}{bet.participantCount} participant{bet.participantCount !== 1 ? 's' : ''}
                     </p>
                     {bet.winnersNames.length > 0 && (
-                      <p className="text-xs text-green-400 font-medium">
+                      <p className="text-xs text-brand font-medium">
                         🏆 {bet.winnersNames.join(', ')}
                       </p>
                     )}
                     {bet.isTie && (
-                      <p className="text-xs text-gray-400 font-medium">🤝 Tie</p>
+                      <p className="text-xs text-muted font-medium">🤝 Tie</p>
                     )}
                   </div>
                 </Card>

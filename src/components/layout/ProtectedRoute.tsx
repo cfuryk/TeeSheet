@@ -13,7 +13,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: Props) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <Spinner size="lg" />
       </div>
     )
@@ -26,7 +26,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: Props) {
   // For admin routes, wait for profile before deciding (avoids false redirect)
   if (requireAdmin && userProfile === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <Spinner size="lg" />
       </div>
     )

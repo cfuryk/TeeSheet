@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useGroup, useGroups } from '@/hooks/useGroup'
+import { useGroup } from '@/hooks/useGroup'
 import { useScores } from '@/hooks/useScore'
 import { useRound } from '@/hooks/useRound'
 import { useActiveRound } from '@/hooks/useActiveRound'
@@ -21,13 +21,12 @@ export function GroupPage() {
     const { currentUser } = useAuth()
     const { round, loading: roundLoading } = useRound(roundId!)
     const { group, loading: groupLoading } = useGroup(roundId!, groupId!)
-    const { groups: allGroups } = useGroups(roundId!)
     const { scores, loading: scoresLoading } = useScores(roundId!, groupId!)
     const { activeRound } = useActiveRound(currentUser?.uid)
     const navigate = useNavigate()
 
     const [profiles, setProfiles] = useState<Record<string, UserProfile>>({})
-    const [starting, setStarting] = useState(false)
+    const [, setStarting] = useState(false)
     const [savingTeams, setSavingTeams] = useState(false)
     const [error, setError] = useState('')
 
@@ -61,6 +60,18 @@ export function GroupPage() {
         })
     }, [group])
 
+    // Auto-start scoring when round is active and this group is still pending
+    useEffect(() => {
+        if (!round || !group) return
+        if (round.status === 'active' && group.status === 'pending' && group.golferIds.includes(currentUser!.uid)) {
+            setStarting(true)
+            groupService.startGroup(roundId!, groupId!)
+                .then(() => navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`))
+                .catch((e) => { setError((e as Error).message); setStarting(false) })
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [round?.status, group?.status])
+
     if (roundLoading || groupLoading) {
         return (
             <div className="flex items-center justify-center pt-16">
@@ -79,48 +90,8 @@ export function GroupPage() {
     const isStandalone = !round.eventId
     const scrambleAdminId = group.groupAdminId ?? group.golferIds[0]
 
-    // Uneven group size warning for scramble
-    const unevenScrambleGroups = isScramble && allGroups.length > 1 &&
-        new Set(allGroups.map((g) => g.golferIds.length)).size > 1
-    const isTwoTeamBestBall = round.scoringFormat === 'two_team' && (
-        round.roundType === 'TWO_TEAM_BB_MATCH_GROSS' ||
-        round.roundType === 'TWO_TEAM_BB_MATCH_NET' ||
-        round.roundType === 'TWO_TEAM_BB_STROKE_GROSS' ||
-        round.roundType === 'TWO_TEAM_BB_STROKE_NET'
-    )
     const allHolesScored = !scoresLoading && scores.length > 0 && scores.every((s) => s.scores.length === 18)
     const canEdit = isCreator && group.status === 'pending'
-
-    // For individual best ball: group-level teams must be 2v2
-    const groupTeamsValid = !isBestBall || (
-        group.teams?.teamA.length === 2 && group.teams?.teamB.length === 2
-    )
-    // For two_team best ball: round-level teamAssignments must give exactly 2 A and 2 B in this group
-    const twoTeamGroupValid = !isTwoTeamBestBall || (() => {
-        const assignments = round.teamAssignments ?? {}
-        const groupA = group.golferIds.filter((id) => assignments[id] === 'A')
-        const groupB = group.golferIds.filter((id) => assignments[id] === 'B')
-        return groupA.length === 2 && groupB.length === 2
-    })()
-    const teamsValid = groupTeamsValid && twoTeamGroupValid
-
-    async function handleStart() {
-        // If there's another active round (not this one), show the conflict modal
-        if (activeRound && activeRound.roundId !== roundId) {
-            setShowConflict(true)
-            return
-        }
-        setStarting(true)
-        setError('')
-        try {
-            await groupService.startGroup(roundId!, groupId!)
-            navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
-        } catch (e) {
-            setError((e as Error).message)
-        } finally {
-            setStarting(false)
-        }
-    }
 
     async function handleAbandonAndStart() {
         if (!activeRound) return
@@ -212,7 +183,7 @@ export function GroupPage() {
             )}
 
             {/* Header */}
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+            <div className="bg-card-bg border border-card-border rounded-xl p-4">
                 {!isStandalone && editing ? (
                     <div className="flex flex-col gap-3">
                         <Input
@@ -233,16 +204,22 @@ export function GroupPage() {
                 ) : (
                     <div className="flex items-stretch justify-between">
                         <div>
-                            <h1 className="text-xl font-bold text-white">{isStandalone ? round.name : (group.name ?? 'Group')}</h1>
-                            <p className="text-gray-400 text-sm">{round.courseName}</p>
+                            <h1 className="text-xl font-bold text-brand">{isStandalone ? round.name : (group.name ?? 'Group')}</h1>
+                            <p className="text-muted text-sm">{round.courseName}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Badge label={statusLabel[group.status]} variant={statusVariant[group.status]} />
+                            {group.status === 'active' ? (
+                                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: '#3A6280' }}>
+                                    Active
+                                </span>
+                            ) : (
+                                <Badge label={statusLabel[group.status]} variant={statusVariant[group.status]} />
+                            )}
                             {!isStandalone && canEdit && (
                                 <button
                                     type="button"
                                     onClick={handleStartEdit}
-                                    className="text-gray-400 hover:text-white transition-colors px-2 py-1 self-stretch flex items-center"
+                                    className="text-muted hover:text-brand transition-colors px-2 py-1 self-stretch flex items-center"
                                     aria-label="Edit group name"
                                 >
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -259,7 +236,7 @@ export function GroupPage() {
 
             {/* Players */}
             <div>
-                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Players</h2>
+                <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Players</h2>
                 <div className="flex flex-col gap-2">
                     {group.golferIds.map((gid) => {
                         const sc = scores.find((s) => s.golferId === gid)
@@ -308,34 +285,13 @@ export function GroupPage() {
                 </Button>
             )}
 
-            {/* Start group button */}
-            {group.status === 'pending' && isCreator && isInGroup && (
-                <div className="flex flex-col gap-2">
-                    {unevenScrambleGroups && (
-                        <p className="text-xs text-center text-yellow-500">
-                            ⚠ Groups have uneven sizes. This is allowed but may affect fairness.
-                        </p>
-                    )}
-                    <Button loading={starting} onClick={handleStart} className="w-full" disabled={!teamsValid}>
-                        Start Round
-                    </Button>
-                    {!teamsValid && (
-                        <p className="text-xs text-center text-yellow-500">
-                            {isTwoTeamBestBall
-                                ? 'This group needs exactly 2 players from each team (A and B) before starting.'
-                                : 'Assign exactly 2 players to each team before starting.'}
-                        </p>
-                    )}
-                </div>
-            )}
-
-            {/* Resume button */}
+            {/* Go to Scorecard */}
             {group.status === 'active' && isInGroup && (
                 <Button
                     onClick={() => navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)}
                     className="w-full"
                 >
-                    Resume Round
+                    Go to Scorecard
                 </Button>
             )}
 
@@ -351,7 +307,7 @@ export function GroupPage() {
 
             {/* Signed */}
             {group.status === 'signed' && (
-                <div className="text-center text-green-400 font-semibold">
+                <div className="text-center text-brand font-semibold">
                     All scores signed ✓
                 </div>
             )}
@@ -359,8 +315,8 @@ export function GroupPage() {
             {/* Delete group — event rounds only, creator, pending */}
             {!isStandalone && canEdit && (
                 confirmDeleteGroup ? (
-                    <div className="flex flex-col gap-2 rounded-xl border border-red-800 bg-red-900/20 p-4">
-                        <p className="text-sm text-red-300 text-center">Delete this group? This cannot be undone.</p>
+                    <div className="flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <p className="text-sm text-danger text-center">Delete this group? This cannot be undone.</p>
                         <div className="flex gap-2">
                             <Button
                                 size="sm"
@@ -372,7 +328,7 @@ export function GroupPage() {
                             </Button>
                             <Button
                                 size="sm"
-                                variant="secondary"
+                                variant="primary"
                                 onClick={() => setConfirmDeleteGroup(false)}
                                 className="flex-1"
                             >
@@ -394,8 +350,8 @@ export function GroupPage() {
             {/* Delete round — standalone rounds only, creator */}
             {isStandalone && isCreator && (
                 confirmDeleteRound ? (
-                    <div className="flex flex-col gap-2 rounded-xl border border-red-800 bg-red-900/20 p-4">
-                        <p className="text-sm text-red-300 text-center">Delete this round? This cannot be undone.</p>
+                    <div className="flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <p className="text-sm text-danger text-center">Delete this round? This cannot be undone.</p>
                         <div className="flex gap-2">
                             <Button
                                 size="sm"
@@ -407,7 +363,7 @@ export function GroupPage() {
                             </Button>
                             <Button
                                 size="sm"
-                                variant="secondary"
+                                variant="primary"
                                 onClick={() => setConfirmDeleteRound(false)}
                                 className="flex-1"
                             >
@@ -429,20 +385,20 @@ export function GroupPage() {
             {/* Active round conflict modal */}
             {showConflict && activeRound && (
                 <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4">
-                    <div className="w-full max-w-lg bg-gray-800 rounded-xl overflow-hidden">
-                        <div className="px-4 py-4 border-b border-gray-700">
-                            <h2 className="text-base font-semibold text-white">Round Already In Progress</h2>
-                            <p className="text-sm text-gray-400 mt-1">
-                                You're currently playing <span className="text-white font-medium">{activeRound.name}</span>. What would you like to do?
+                    <div className="w-full max-w-lg bg-card-bg rounded-xl overflow-hidden">
+                        <div className="px-4 py-4 border-b border-card-border">
+                            <h2 className="text-base font-semibold text-brand">Round Already In Progress</h2>
+                            <p className="text-sm text-muted mt-1">
+                                You're currently playing <span className="text-brand font-medium">{activeRound.name}</span>. What would you like to do?
                             </p>
                         </div>
                         <div className="flex flex-col gap-3 p-4">
                             <button
                                 type="button"
                                 onClick={() => { setShowConflict(false); navigate(`/rounds/${activeRound.roundId}`) }}
-                                className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors"
+                                className="w-full py-3 rounded-xl bg-brand hover:bg-brand-hover text-white font-semibold transition-colors"
                             >
-                                Go Back & Finish Active Round
+                                Go Back &amp; Finish Active Round
                             </button>
                             <button
                                 type="button"
@@ -455,7 +411,7 @@ export function GroupPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowConflict(false)}
-                                className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold transition-colors"
+                                className="w-full py-3 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors"
                             >
                                 Cancel
                             </button>

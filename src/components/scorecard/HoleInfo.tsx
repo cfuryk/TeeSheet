@@ -8,14 +8,18 @@ interface Props {
   onSelect: (score: number) => void
   strokes?: number
   navigation: React.ReactNode
+  golferName?: string
+  courseHandicap?: number
+  vsPar?: number | null
+  holesPlayed?: number
+  totalGross?: number | null
+  isLocked?: boolean
 }
 
-export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation }: Props) {
+export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation, golferName, courseHandicap, vsPar, holesPlayed, totalGross, isLocked }: Props) {
   const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-
-  const displayed = currentScore ?? hole.par
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -25,16 +29,30 @@ export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation
 
   function scoreBadgeClass(score: number): string {
     const diff = score - hole.par
-    if (diff <= -2) return 'text-red-400 ring-2 ring-red-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-red-400 outline-offset-[-6px] rounded-full'
-    if (diff === -1) return 'text-red-400 ring-2 ring-red-400 rounded-full'
-    if (diff === 0) return 'text-white'
-    if (diff === 1) return 'text-blue-400 ring-2 ring-blue-400'
-    return 'text-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-blue-400 outline-offset-[-6px]'
+    if (diff <= -2) return 'text-danger ring-2 ring-danger ring-offset-[3px] ring-offset-card-bg outline outline-2 outline-danger outline-offset-[-3px] rounded-full'
+    if (diff === -1) return 'text-danger ring-2 ring-danger rounded-full'
+    if (diff === 0) return 'text-brand'
+    if (diff === 1) return 'text-[#3A6280] ring-2 ring-[#3A6280]'
+    return 'text-[#3A6280] ring-2 ring-[#3A6280] ring-offset-[3px] ring-offset-card-bg outline outline-2 outline-[#3A6280] outline-offset-[-3px]'
+  }
+
+  function vsParLabel(v: number) {
+    if (v === 0) return 'E'
+    return v > 0 ? `+${v}` : `${v}`
+  }
+
+  function thruLabel() {
+    if (holesPlayed === undefined) return '-'
+    if (holesPlayed === 18 && isLocked) return 'F'
+    return `${holesPlayed}`
   }
 
   function adjust(delta: number) {
-    const next = Math.max(1, displayed + delta)
-    onSelect(next)
+    if (currentScore === null) {
+      onSelect(hole.par)
+    } else {
+      onSelect(Math.max(1, currentScore + delta))
+    }
   }
 
   function commitInput() {
@@ -45,38 +63,69 @@ export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3">
+    <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+      {/* Player stat header */}
+      {golferName && (
+        <div className="bg-brand px-4 py-3 mb-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-lg font-bold text-white leading-tight">{golferName}</p>
+              {courseHandicap !== undefined && (
+                <p className="text-xs text-white/60">Handicap: {courseHandicap}</p>
+              )}
+            </div>
+            <div className="flex gap-4 text-center">
+              <div>
+                <p className="text-xs text-white/60 uppercase tracking-wide">Round</p>
+                <p className={`text-base font-bold ${vsPar !== null && vsPar !== undefined ? (vsPar < 0 ? 'text-red-400' : vsPar > 0 ? 'text-[#7BAFD4]' : 'text-white') : 'text-white/60'}`}>
+                  {vsPar !== null && vsPar !== undefined ? vsParLabel(vsPar) : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60 uppercase tracking-wide">Thru</p>
+                <p className="text-base font-bold text-white">{thruLabel()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60 uppercase tracking-wide">Total</p>
+                <p className="text-base font-bold text-white">{totalGross ?? '-'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="px-4 py-3">
       {/* Hole stats row */}
       <div className="flex items-center justify-between mb-3">
         <div className="text-center">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Hole</p>
-          <p className="text-2xl font-black text-green-400">{hole.number}</p>
+          <p className="text-xs text-muted uppercase tracking-wide">Hole</p>
+          <p className="text-2xl font-black text-brand">{hole.number}</p>
         </div>
         <div className="flex gap-5 text-center">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Par</p>
-            <p className="text-2xl font-bold text-white">{hole.par}</p>
+            <p className="text-xs text-muted uppercase tracking-wide">Par</p>
+            <p className="text-2xl font-bold text-brand">{hole.par}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Yards</p>
-            <p className="text-2xl font-bold text-white">{hole.yardage}</p>
+            <p className="text-xs text-muted uppercase tracking-wide">Yards</p>
+            <p className="text-2xl font-bold text-brand">{hole.yardage}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">HCP</p>
-            <p className="text-2xl font-bold text-white">{hole.handicap}</p>
+            <p className="text-xs text-muted uppercase tracking-wide">HCP</p>
+            <p className="text-2xl font-bold text-brand">{hole.handicap}</p>
           </div>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="border-t border-gray-700 mb-3" />
+      <div className="border-t border-card-border mb-3" />
 
       {/* Score stepper */}
       <div className="flex items-center justify-between h-12">
         <button
           type="button"
           onClick={() => adjust(-1)}
-          className="w-9 h-9 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xl font-bold flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-full bg-btn-secondary text-brand text-xl font-bold flex items-center justify-center transition-colors hover:bg-[#3A6280] hover:text-white"
         >
           −
         </button>
@@ -92,17 +141,17 @@ export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation
               onChange={(e) => setInputVal(e.target.value)}
               onBlur={commitInput}
               onKeyDown={(e) => { if (e.key === 'Enter') commitInput() }}
-              className="w-12 h-12 text-center text-3xl font-black bg-transparent text-white border-b-2 border-green-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-12 h-12 text-center text-3xl font-black bg-transparent text-brand border-b-2 border-brand outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           ) : (
             <button
               type="button"
-              onClick={() => { setEditing(true); setInputVal(String(displayed)) }}
+              onClick={() => { setEditing(true); setInputVal(currentScore !== null ? String(currentScore) : '') }}
               className={`w-12 h-12 inline-flex items-center justify-center text-3xl font-black transition-all ${
-                currentScore !== null ? scoreBadgeClass(currentScore) : 'text-gray-600'
+                currentScore !== null ? scoreBadgeClass(currentScore) : 'text-muted'
               }`}
             >
-              {displayed}
+              {currentScore !== null ? currentScore : '-'}
             </button>
           )}
         </div>
@@ -110,25 +159,26 @@ export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation
         <button
           type="button"
           onClick={() => adjust(1)}
-          className="w-9 h-9 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xl font-bold flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-full bg-btn-secondary text-brand text-xl font-bold flex items-center justify-center transition-colors hover:bg-[#3A6280] hover:text-white"
         >
           +
         </button>
       </div>
 
       {strokes > 0 && (
-        <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-green-400">
+        <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-brand">
           <span className="flex gap-0.5">
             {Array.from({ length: strokes }).map((_, i) => (
-              <span key={i} className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+              <span key={i} className="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
             ))}
           </span>
           <span>{strokes} stroke{strokes > 1 ? 's' : ''} on this hole</span>
         </div>
       )}
 
-      <div className="border-t border-gray-700 mt-4 pt-3">
+      <div className="border-t border-card-border mt-4 pt-3">
         {navigation}
+      </div>
       </div>
     </div>
   )

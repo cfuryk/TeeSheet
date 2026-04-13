@@ -74,7 +74,7 @@ export function SimpleScorePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-white">Enter Score</h2>
+      <h2 className="text-xl font-bold text-brand">Enter Score</h2>
       <Card className="p-4">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {error && <Alert message={error} />}

@@ -11,6 +11,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isRoundMember(roundId) {
+      return request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds
+        || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid;
+    }
+
+    function isEventMemberOfRound(roundId) {
+      let eventId = get(/databases/$(database)/documents/rounds/$(roundId)).data.eventId;
+      return eventId != null
+        && request.auth.uid in get(/databases/$(database)/documents/events/$(eventId)).data.memberIds;
+    }
+
     // =========================================================================
     // users/{uid}
     // =========================================================================
@@ -36,7 +47,6 @@ service cloud.firestore {
     // events/{eventId}
     // =========================================================================
     match /events/{eventId} {
-      // Public events visible to all authed users; private only to members, creator, or admin
       allow read: if isAuthed()
         && (resource.data.isPrivate == false
           || resource.data.createdBy == request.auth.uid
@@ -49,42 +59,27 @@ service cloud.firestore {
         && (resource.data.createdBy == request.auth.uid
           || isAdmin()
           || request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['memberIds', 'handicaps', 'updatedAt']));
+               .hasOnly(['memberIds', 'handicaps', 'roundIds', 'updatedAt']));
 
       allow delete: if isAuthed()
         && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
     // =========================================================================
-    // scores/{scoreId}  — top-level golfer score records
+    // scores/{scoreId}  — top-level golfer score records (handicap history)
     // =========================================================================
     match /scores/{scoreId} {
-      // Golfer can read their own scores; admin can read all
       allow read: if isAuthed()
         && (request.auth.uid == resource.data.golferId || isAdmin());
 
-      // Any authed user can create a score for themselves
       allow create: if isAuthed()
         && request.resource.data.golferId == request.auth.uid;
 
-      // Only scoreId backfill update (same golferId); admin can update any
       allow update: if isAuthed()
         && (resource.data.golferId == request.auth.uid || isAdmin());
 
-      // Golfer can delete their own scores; admin can delete any
       allow delete: if isAuthed()
         && (resource.data.golferId == request.auth.uid || isAdmin());
-    }
-
-    // =========================================================================
-    // invites/{token}
-    // =========================================================================
-    match /invites/{token} {
-      // Anyone (including unauthenticated) can read to follow a shared link
-      allow read: if true;
-      // Only authenticated users can create invites for themselves
-      allow create: if isAuthed() && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if false;
     }
 
     // =========================================================================
@@ -95,7 +90,9 @@ service cloud.firestore {
         && (isAdmin()
           || resource.data.isPrivate == false
           || resource.data.createdBy == request.auth.uid
-          || request.auth.uid in resource.data.memberIds);
+          || request.auth.uid in resource.data.memberIds
+          || (resource.data.eventId != null
+              && request.auth.uid in get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.memberIds));
 
       allow create: if isAuthed();
 
@@ -103,113 +100,94 @@ service cloud.firestore {
         && (isAdmin()
           || resource.data.createdBy == request.auth.uid
           || request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['groupIds', 'memberIds', 'status', 'updatedAt']));
+               .hasOnly(['memberIds', 'groupIds', 'status', 'updatedAt']));
 
       allow delete: if isAuthed()
         && (isAdmin() || resource.data.createdBy == request.auth.uid);
 
       // =====================================================================
-      // groups subcollection
+      // rounds/{roundId}/groups/{groupId}
       // =====================================================================
       match /groups/{groupId} {
-        // Any member of the round or admin can read groups
         allow read: if isAuthed()
-          && (isAdmin()
-            || request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds
+          && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId)
             || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
 
-        allow create: if isAuthed();
+        allow create: if isAuthed()
+          && get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid;
 
         allow update: if isAuthed()
           && (isAdmin()
+            || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid
             || request.auth.uid in resource.data.golferIds
-            || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
+            || isEventMemberOfRound(roundId));
 
         allow delete: if isAuthed()
           && (isAdmin()
             || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
 
-        // ==================================================================
-        // scores subcollection
-        // ==================================================================
+        // =================================================================
+        // rounds/{roundId}/groups/{groupId}/scores/{uid}
+        // =================================================================
         match /scores/{uid} {
-          // Any group member or round creator or admin can read scores
           allow read: if isAuthed()
-            && (isAdmin()
-              || request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)/groups/$(groupId)).data.golferIds
-              || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
+            && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId));
 
-          // Round creator or admin can create (batch-write in startGroup)
           allow create: if isAuthed()
             && (isAdmin()
-              || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
+              || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid
+              || isEventMemberOfRound(roundId));
 
-          // Golfer can update their own score if not locked; round creator/admin can always update
           allow update: if isAuthed()
             && (isAdmin()
-              || (request.auth.uid == uid && resource.data.isLocked == false)
-              || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
+              || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid
+              || request.auth.uid == uid);
 
-          allow delete: if isAdmin();
+          allow delete: if isAuthed()
+            && (isAdmin()
+              || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid
+              || request.auth.uid == uid);
         }
       }
 
       // =====================================================================
-      // sideBets subcollection
-      // =====================================================================
-      match /sideBets/{sideBetId} {
-        // Any round member, creator, or admin can read side bets
-        allow read: if isAuthed()
-          && (isAdmin()
-            || request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds
-            || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
-
-        // Any round member can create a side bet
-        allow create: if isAuthed()
-          && (isAdmin()
-            || request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds);
-
-        // Creator, invited party, or any round member (for public bets) can update
-        allow update: if isAuthed()
-          && (isAdmin()
-            || request.auth.uid == resource.data.createdBy
-            || request.auth.uid in resource.data.invitedIds
-            || (resource.data.isPublic == true
-                && request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds));
-
-        // Creator or admin can delete
-        allow delete: if isAuthed()
-          && (isAdmin()
-            || request.auth.uid == resource.data.createdBy);
-      }
-      // =====================================================================
-      // messages subcollection
+      // rounds/{roundId}/messages/{messageId}  — round chat
       // =====================================================================
       match /messages/{messageId} {
         allow read: if isAuthed()
-          && (isAdmin()
-            || request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds);
+          && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId));
 
         allow create: if isAuthed()
-          && request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)).data.memberIds
+          && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId))
           && request.resource.data.uid == request.auth.uid;
 
-        allow update, delete: if isAdmin();
+        allow update, delete: if false;
+      }
+
+      // =====================================================================
+      // rounds/{roundId}/scores/{uid}  — live scoring subcollection
+      // =====================================================================
+      match /scores/{uid} {
+        // Any round member, event member, or admin can read all scores (leaderboard)
+        allow read: if isAuthed()
+          && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId));
+
+        // Round creator or admin creates the score doc on round start
+        allow create: if isAuthed()
+          && (isAdmin()
+            || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
+
+        // Golfer can update their own score while active; creator/admin can always update
+        allow update: if isAuthed()
+          && (isAdmin()
+            || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid
+            || (request.auth.uid == uid && resource.data.status == 'active'));
+
+        allow delete: if isAuthed()
+          && (isAdmin()
+            || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid);
       }
     }
 
-    // =========================================================================
-    // notifications/{uid}/items/{notificationId}
-    // =========================================================================
-    match /notifications/{uid}/items/{notificationId} {
-      allow read, write: if isAuthed() && request.auth.uid == uid;
-    }
-
-    // =========================================================================
-    // sideBets collectionGroup — admin read across all rounds
-    // =========================================================================
-    match /{path=**}/sideBets/{sideBetId} {
-      allow read: if isAdmin();
-    }
   }
 }

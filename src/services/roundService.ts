@@ -14,8 +14,11 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import type { Round, RoundFormData, RoundStatus } from '@/types'
+import type { Round, RoundFormData, RoundStatus, Score } from '@/types'
 import { localDateFromString } from '@/lib/formatters'
+import { courseService } from './courseService'
+import { golferScoreService } from './golferScoreService'
+import { userService } from './userService'
 
 function autoCloseStale(rounds: Round[]): Round[] {
   const startOfToday = new Date()
@@ -71,6 +74,13 @@ export const roundService = {
     const snap = await getDoc(doc(db, 'rounds', roundId))
     if (!snap.exists()) return null
     return { roundId: snap.id, ...snap.data() } as Round
+  },
+
+  async activateRound(roundId: string): Promise<void> {
+    await updateDoc(doc(db, 'rounds', roundId), {
+      status: 'active' as RoundStatus,
+      updatedAt: serverTimestamp(),
+    })
   },
 
   onRoundSnapshot(roundId: string, callback: (round: Round | null) => void): () => void {
@@ -137,6 +147,16 @@ export const roundService = {
   },
 
   async deleteRound(roundId: string): Promise<void> {
+    // Delete group subcollections first (while round doc still exists for rules evaluation)
+    const groupsSnap = await getDocs(collection(db, 'rounds', roundId, 'groups'))
+    for (const groupDoc of groupsSnap.docs) {
+      const scoresSnap = await getDocs(
+        collection(db, 'rounds', roundId, 'groups', groupDoc.id, 'scores')
+      )
+      await Promise.all(scoresSnap.docs.map((d) => deleteDoc(d.ref)))
+      await deleteDoc(groupDoc.ref)
+    }
+    // Delete the round doc last
     await deleteDoc(doc(db, 'rounds', roundId))
   },
 
@@ -187,5 +207,58 @@ export const roundService = {
       teamAssignments: assignments,
       updatedAt: serverTimestamp(),
     })
+  },
+
+  /** Force-complete a round: mark all groups signed + round completed, regardless of signing state.
+   *  Players who already signed (isLocked) will still have their score submitted for handicap. */
+  async forceCompleteRound(roundId: string): Promise<void> {
+    const round = await roundService.getRound(roundId)
+    if (!round) return
+
+    // Mark all groups as signed
+    const groupsSnap = await getDocs(collection(db, 'rounds', roundId, 'groups'))
+    await Promise.all(
+      groupsSnap.docs.map((d) =>
+        updateDoc(d.ref, { status: 'signed', updatedAt: serverTimestamp() })
+      )
+    )
+
+    // Mark round completed
+    await updateDoc(doc(db, 'rounds', roundId), {
+      status: 'completed',
+      updatedAt: serverTimestamp(),
+    })
+
+    // Submit handicap scores for players who already signed their card
+    if (round.scoringFormat !== 'scramble') {
+      const course = await courseService.getCourse(round.courseId)
+      const tee = course?.tees.find((t: { teeId: string }) => t.teeId === round.teeId)
+      if (tee) {
+        for (const uid of round.memberIds ?? []) {
+          for (const groupDoc of groupsSnap.docs) {
+            const scoreSnap = await getDoc(doc(db, 'rounds', roundId, 'groups', groupDoc.id, 'scores', uid))
+            if (!scoreSnap.exists()) continue
+            const s = scoreSnap.data() as Score
+            if (!s.isLocked || s.totalGross == null) continue
+            await golferScoreService.addScoreFromFull({
+              golferId: uid,
+              golferName: s.golferName,
+              roundId,
+              courseId: round.courseId,
+              courseName: round.courseName,
+              teeId: round.teeId,
+              teeName: round.teeName,
+              date: round.date,
+              grossScore: s.totalGross,
+              netScore: s.totalNet ?? null,
+              courseRating: tee.rating,
+              slope: tee.slope,
+            })
+            break
+          }
+          await userService.recalculateHandicap(uid)
+        }
+      }
+    }
   },
 }

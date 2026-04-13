@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { userService } from '@/services/userService'
 import { useRound } from '@/hooks/useRound'
@@ -11,7 +11,6 @@ import { golferScoreService } from '@/services/golferScoreService'
 import { GroupCard } from '@/components/round/GroupCard'
 import { RoundCard } from '@/components/round/RoundCard'
 import { ManageGroupsModal } from '@/components/round/ManageGroupsModal'
-import { InviteModal } from '@/components/event/InviteModal'
 import { Button, Spinner, Alert } from '@/components/ui'
 import {
     matchPlayPoints,
@@ -30,8 +29,10 @@ export function RoundDetailPage() {
     const [deleting, setDeleting] = useState(false)
     const [managingGroups, setManagingGroups] = useState(false)
     const [error, setError] = useState('')
-    const [showInvite, setShowInvite] = useState(false)
+    const [activating, setActivating] = useState(false)
     const [savingTeams, setSavingTeams] = useState(false)
+    const [confirmForceComplete, setConfirmForceComplete] = useState(false)
+    const [forcingComplete, setForcingComplete] = useState(false)
     const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({})
     const [allScores, setAllScores] = useState<Score[]>([])
     const navigate = useNavigate()
@@ -75,6 +76,8 @@ export function RoundDetailPage() {
     const isCompleted = round.status === 'completed'
     const isStandalone = !round.eventId
     const isFull = isStandalone && (round.memberIds?.length ?? 0) >= 4
+    const allGroupsSigned = groups.length > 0 && groups.every((g) => g.status === 'signed')
+    const canForceComplete = isStandalone && isCreator && (round.status === 'active' || (isCompleted && !allGroupsSigned))
 
     // Compute winner summary for completed rounds
     const winnerSummary = isCompleted && allScores.length > 0 ? computeWinner(round, groups, allScores) : null
@@ -126,8 +129,44 @@ export function RoundDetailPage() {
         setSavingTeams(false)
     }
 
+    async function handleActivate() {
+        if (!round) return
+        setActivating(true)
+        setError('')
+        try {
+            await roundService.activateRound(round.roundId)
+        } catch {
+            setError('Failed to activate round.')
+        } finally {
+            setActivating(false)
+        }
+    }
+
+    async function handleForceComplete() {
+        if (!round) return
+        setForcingComplete(true)
+        setError('')
+        try {
+            await roundService.forceCompleteRound(round.roundId)
+            setConfirmForceComplete(false)
+        } catch {
+            setError('Failed to complete round.')
+        } finally {
+            setForcingComplete(false)
+        }
+    }
+
     return (
         <div className="flex flex-col gap-4">
+            {/* Back to event */}
+            {round.eventId && (
+                <Link
+                    to={`/events/${round.eventId}`}
+                    className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-semibold transition-colors"
+                >
+                    Back to Event
+                </Link>
+            )}
             {/* Header */}
             <RoundCard
                 round={round}
@@ -142,21 +181,21 @@ export function RoundDetailPage() {
             {/* Two Team assignment — creator only, pending only */}
             {round.scoringFormat === 'two_team' && isCreator && round.status === 'pending' && round.memberIds?.length > 0 && (
                 <div>
-                    <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">
                         Team Assignment
                     </h2>
-                    <div className="bg-gray-800 border border-gray-700 rounded-xl divide-y divide-gray-700">
+                    <div className="bg-card-bg border border-card-border rounded-xl divide-y divide-card-border">
                         {round.memberIds.map((mid) => {
                             const side = round.teamAssignments?.[mid]
                             return (
                                 <div key={mid} className="flex items-center justify-between px-4 py-3">
-                                    <span className="text-sm text-white">{memberProfiles[mid]?.displayName ?? '…'}</span>
+                                    <span className="text-sm text-brand">{memberProfiles[mid]?.displayName ?? '…'}</span>
                                     <button
                                         onClick={() => handleTeamToggle(mid)}
                                         disabled={savingTeams}
-                                        className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-colors ${side === 'A' ? 'border-green-500 bg-green-500/20 text-green-400'
+                                        className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-colors ${side === 'A' ? 'border-brand bg-brand/10 text-brand'
                                                 : side === 'B' ? 'border-blue-500 bg-blue-500/20 text-blue-400'
-                                                    : 'border-gray-600 bg-gray-700 text-gray-500'
+                                                    : 'border-card-border bg-card-bg text-muted'
                                             }`}
                                     >
                                         {side ?? '—'}
@@ -165,7 +204,7 @@ export function RoundDetailPage() {
                             )
                         })}
                     </div>
-                    <p className="text-xs text-gray-500 mt-2 text-center">Tap to cycle: unassigned → A → B</p>
+                    <p className="text-xs text-muted mt-2 text-center">Tap to cycle: unassigned → A → B</p>
                 </div>
             )}
 
@@ -173,12 +212,12 @@ export function RoundDetailPage() {
             {isCompleted && !round.simpleGrossScore && (
                 <div className="flex flex-col gap-4">
                     {winnerSummary && (
-                        <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 flex flex-col gap-2">
+                        <div className="bg-card-bg border border-card-border rounded-xl px-4 py-3 flex flex-col gap-2">
                             <div className="flex items-center gap-3">
                                 <span className="text-xl">🏆</span>
                                 <div>
-                                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Winner</p>
-                                    <p className="text-white font-semibold">{winnerSummary.label}</p>
+                                    <p className="text-xs text-muted uppercase tracking-wide font-semibold">Winner</p>
+                                    <p className="text-brand font-semibold">{winnerSummary.label}</p>
                                 </div>
                             </div>
                         </div>
@@ -189,20 +228,27 @@ export function RoundDetailPage() {
                 </div>
             )}
 
-            {/* Resume Scorecard — active round, user has a group */}
-            {round.status === 'active' && userGroup && userGroup.status === 'active' && (
+            {/* Activate Round — admin only, pending */}
+            {round.status === 'pending' && isAdmin && groups.length > 0 && (
+                <Button loading={activating} onClick={handleActivate} className="w-full">
+                    Activate Round
+                </Button>
+            )}
+
+            {/* Go to Scorecard — active round, user has a group */}
+            {round.status === 'active' && userGroup && (userGroup.status === 'active' || userGroup.status === 'pending') && (
                 <Button
                     onClick={() => navigate(`/rounds/${round.roundId}/groups/${userGroup.groupId}/scorecard`)}
                     className="w-full"
                 >
-                    Resume Round
+                    Go to Scorecard
                 </Button>
             )}
 
             {/* Groups */}
             <div>
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+                    <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
                         Groups ({groups.length})
                     </h2>
                     {!isParticipant && round.status === 'pending' && !isFull && (
@@ -214,7 +260,7 @@ export function RoundDetailPage() {
                         </Button>
                     )}
                     {!isParticipant && round.status === 'pending' && isFull && (
-                        <span className="text-xs text-gray-500">Round full (4/4)</span>
+                        <span className="text-xs text-muted">Round full (4/4)</span>
                     )}
                     {isParticipant && !userGroup && round.status === 'pending' && (
                         <Button size="sm" loading={joining} onClick={() => {
@@ -227,7 +273,7 @@ export function RoundDetailPage() {
                 </div>
 
                 {groups.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center py-6">
+                    <p className="text-muted text-sm text-center py-6">
                         No groups yet.{' '}
                         {round.status === 'pending' ? 'Be the first to join!' : ''}
                     </p>
@@ -239,6 +285,7 @@ export function RoundDetailPage() {
                                 group={g}
                                 roundId={round.roundId}
                                 currentUserId={uid}
+                                memberProfiles={memberProfiles}
                             />
                         ))}
                     </div>
@@ -251,8 +298,8 @@ export function RoundDetailPage() {
                     <Button variant="secondary" onClick={() => navigate(`/rounds/${round.roundId}/edit`)}>
                         Edit Round
                     </Button>
-                    <Button onClick={() => setShowInvite(true)}>
-                        + Invite Golfers
+                    <Button variant="secondary" onClick={() => navigate(`/invite-golfers?targetType=round&targetId=${round.roundId}&roundName=${encodeURIComponent(round.name)}`)}>
+                        Invite Golfers
                     </Button>
                     {groups.length > 1 && (
                         <Button variant="secondary" onClick={() => setManagingGroups(true)}>
@@ -262,15 +309,37 @@ export function RoundDetailPage() {
                 </>
             )}
 
+            {/* Force complete — creator only, active or auto-closed standalone round with unsigned groups */}
+            {canForceComplete && (
+                confirmForceComplete ? (
+                    <div className="flex flex-col gap-2 rounded-xl border border-orange-200 bg-orange-50 p-4">
+                        <p className="text-sm text-brand text-center font-semibold">Mark round as complete?</p>
+                        <p className="text-xs text-muted text-center">Players who haven't signed will be skipped. This cannot be undone.</p>
+                        <div className="flex gap-2 mt-1">
+                            <Button size="sm" loading={forcingComplete} onClick={handleForceComplete} className="flex-1 bg-green-600 hover:bg-green-700">
+                                Yes, complete round
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => setConfirmForceComplete(false)} className="flex-1">
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <Button variant="secondary" onClick={() => setConfirmForceComplete(true)} className="w-full">
+                        Mark Round Complete
+                    </Button>
+                )
+            )}
+
             {(canManage || isAdmin) && (
                 confirmDelete ? (
-                    <div className="flex flex-col gap-2 rounded-xl border border-red-800 bg-red-900/20 p-4">
-                        <p className="text-sm text-red-300 text-center">Delete this round? This cannot be undone.</p>
+                    <div className="flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <p className="text-sm text-danger text-center">Delete this round? This cannot be undone.</p>
                         <div className="flex gap-2">
                             <Button size="sm" loading={deleting} onClick={handleDelete} className="flex-1 bg-red-600 hover:bg-red-700">
                                 Yes, delete
                             </Button>
-                            <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(false)} className="flex-1">
+                            <Button size="sm" variant="primary" onClick={() => setConfirmDelete(false)} className="flex-1">
                                 Cancel
                             </Button>
                         </div>
@@ -286,16 +355,6 @@ export function RoundDetailPage() {
                 )
             )}
 
-            {showInvite && (
-                <InviteModal
-                    targetType="round"
-                    targetId={round.roundId}
-                    createdBy={uid}
-                    targetName={round.name}
-                    onClose={() => setShowInvite(false)}
-                />
-            )}
-
             {managingGroups && (
                 <ManageGroupsModal
                     roundId={round.roundId}
@@ -306,13 +365,13 @@ export function RoundDetailPage() {
 
             {joinPickerOpen && (
                 <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 pb-4">
-                    <div className="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl flex flex-col">
-                        <div className="flex items-center justify-between p-4 border-b border-gray-700">
-                            <h2 className="font-bold text-white text-lg">Join a Group</h2>
+                    <div className="w-full max-w-lg bg-white border border-card-border rounded-2xl flex flex-col">
+                        <div className="flex items-center justify-between p-4 border-b border-card-border">
+                            <h2 className="font-bold text-brand text-lg">Join a Group</h2>
                             <button
                                 type="button"
                                 onClick={() => setJoinPickerOpen(false)}
-                                className="text-gray-400 hover:text-white transition-colors text-2xl leading-none"
+                                className="text-muted hover:text-brand transition-colors text-2xl leading-none"
                             >
                                 ×
                             </button>
@@ -324,20 +383,20 @@ export function RoundDetailPage() {
                                     type="button"
                                     disabled={joining}
                                     onClick={() => handleJoin(g.groupId)}
-                                    className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 hover:border-green-500/50 transition-colors"
+                                    className="w-full text-left bg-card-bg border border-card-border rounded-xl px-4 py-3 hover:border-brand/50 transition-colors"
                                 >
-                                    <p className="text-white font-semibold">{g.name ?? 'Group'}</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">{g.golferIds.length} / 4 players</p>
+                                    <p className="text-brand font-semibold">{g.name ?? 'Group'}</p>
+                                    <p className="text-xs text-muted mt-0.5">{g.golferIds.length} / 4 players</p>
                                 </button>
                             ))}
                             <button
                                 type="button"
                                 disabled={joining}
                                 onClick={() => handleJoin()}
-                                className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 hover:border-green-500/50 transition-colors"
+                                className="w-full text-left bg-card-bg border border-card-border rounded-xl px-4 py-3 hover:border-brand/50 transition-colors"
                             >
-                                <p className="text-white font-semibold">+ Create New Group</p>
-                                <p className="text-xs text-gray-400 mt-0.5">Start a new group by yourself</p>
+                                <p className="text-brand font-semibold">+ Create New Group</p>
+                                <p className="text-xs text-muted mt-0.5">Start a new group by yourself</p>
                             </button>
                         </div>
                     </div>

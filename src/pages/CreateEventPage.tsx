@@ -40,7 +40,7 @@ export function CreateEventPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-white">Create Event</h1>
+      <h1 className="text-2xl font-bold text-brand">Create Event</h1>
 
       {error && <Alert message={error} />}
 
@@ -60,7 +60,7 @@ export function CreateEventPage() {
               />
             )}
           />
-          <label className="flex items-center gap-2 text-sm text-gray-300">
+          <label className="flex items-center gap-2 text-sm text-brand">
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private event
           </label>

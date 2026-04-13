@@ -62,7 +62,7 @@ export function PlayerScorecardPage() {
       <Button onClick={handleBack}>
         {backLabel}
       </Button>
-      <h1 className="text-xl font-bold text-white">{groupScores[0].golferName}</h1>
+      <h1 className="text-xl font-bold text-brand">{groupScores[0].golferName}</h1>
       <ScorecardGrid scores={groupScores} holes={tee.holes} isNet={useNet} showBestBall={isBestBall && groupScores.length > 1} />
     </div>
   )

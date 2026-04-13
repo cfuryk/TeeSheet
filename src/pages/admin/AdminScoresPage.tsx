@@ -58,13 +58,13 @@ export function AdminScoresPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">Admin Scores</h2>
+        <h2 className="text-xl font-bold text-brand">Admin Scores</h2>
         <Button variant="primary" size="sm" onClick={() => navigate('/admin')}>Back</Button>
       </div>
 
       {/* Filters */}
       <Card className="p-4 flex flex-col gap-3">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Filters</p>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wide">Filters</p>
         <div className="grid grid-cols-1 gap-3">
           <Input
             placeholder="Golfer name"
@@ -84,7 +84,7 @@ export function AdminScoresPage() {
         </div>
         {(filterName || filterCourse || filterDate) && (
           <button
-            className="text-xs text-gray-400 hover:text-white text-left"
+            className="text-xs text-muted hover:text-brand text-left"
             onClick={() => { setFilterName(''); setFilterCourse(''); setFilterDate('') }}
           >
             Clear filters
@@ -96,7 +96,7 @@ export function AdminScoresPage() {
         <div className="flex justify-center py-12"><Spinner /></div>
       ) : filtered.length === 0 ? (
         <Card className="p-6 text-center">
-          <p className="text-gray-400">No scores found.</p>
+          <p className="text-muted">No scores found.</p>
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
@@ -104,15 +104,15 @@ export function AdminScoresPage() {
             <Card key={s.scoreId} className="p-4">
               <div className="flex items-start justify-between mb-2">
                 <div className="min-w-0 flex-1 mr-3">
-                  <p className="font-semibold text-white truncate">{s.golferName}</p>
-                  <p className="text-sm text-gray-400 truncate">{s.courseName} — {s.teeName}</p>
-                  <p className="text-xs text-gray-500">{formatDate(s.date)}</p>
+                  <p className="font-semibold text-brand truncate">{s.golferName}</p>
+                  <p className="text-sm text-muted truncate">{s.courseName} — {s.teeName}</p>
+                  <p className="text-xs text-muted">{formatDate(s.date)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {editingId === s.scoreId ? (
                     <div className="flex flex-col gap-2 items-end">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">Gross</span>
+                        <span className="text-xs text-muted">Gross</span>
                         <Input
                           type="number"
                           value={editGross}
@@ -121,7 +121,7 @@ export function AdminScoresPage() {
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">Net</span>
+                        <span className="text-xs text-muted">Net</span>
                         <Input
                           type="number"
                           value={editNet}
@@ -137,18 +137,18 @@ export function AdminScoresPage() {
                     </div>
                   ) : (
                     <>
-                      <span className="text-2xl font-bold text-white">{s.grossScore}</span>
-                      {s.netScore != null && <span className="text-sm text-gray-400">Net {s.netScore}</span>}
+                      <span className="text-2xl font-bold text-brand">{s.grossScore}</span>
+                      {s.netScore != null && <span className="text-sm text-muted">Net {s.netScore}</span>}
                       <Button size="sm" variant="secondary" onClick={() => startEdit(s)}>Edit</Button>
                     </>
                   )}
                 </div>
               </div>
-              <div className="pt-2 border-t border-gray-700 flex items-center gap-3">
-                <p className="text-xs text-gray-500">
-                  Differential: <span className="text-gray-300">{formatHandicap(s.differential)}</span>
+              <div className="pt-2 border-t border-card-border flex items-center gap-3">
+                <p className="text-xs text-muted">
+                  Differential: <span className="text-brand">{formatHandicap(s.differential)}</span>
                 </p>
-                <p className="text-xs text-gray-500 capitalize">{s.source}</p>
+                <p className="text-xs text-muted capitalize">{s.source}</p>
               </div>
             </Card>
           ))}

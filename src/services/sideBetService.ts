@@ -15,7 +15,6 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { notificationService } from '@/services/notificationService'
 import type { SideBet, SideBetStatus, SideBetType } from '@/types'
 import type { Score } from '@/types'
 
@@ -25,16 +24,6 @@ const IMPLEMENTED_TYPES: SideBetType[] = [
   'CHALLENGE_TEAM_GROSS',
   'CHALLENGE_TEAM_NET',
 ]
-
-const BET_LABELS: Record<SideBetType, string> = {
-  CHALLENGE_GROSS: 'Challenge Golfers (Gross)',
-  CHALLENGE_NET: 'Challenge Golfers (Net)',
-  CHALLENGE_TEAM_GROSS: 'Challenge Teams (Gross)',
-  CHALLENGE_TEAM_NET: 'Challenge Teams (Net)',
-  NASSAU_GROSS: 'Nassau (Gross)',
-  NASSAU_NET: 'Nassau (Net)',
-  SKINS: 'Skins',
-}
 
 function sideBetsPath(roundId: string) {
   return collection(db, 'rounds', roundId, 'sideBets')
@@ -72,20 +61,6 @@ export const sideBetService = {
     })
     await updateDoc(ref, { sideBetId: ref.id })
 
-    if (data.invitedIds.length > 0) {
-      void Promise.all(
-        data.invitedIds.map((uid) =>
-          notificationService.createNotification(uid, {
-            type: 'bet_invite',
-            title: 'You were invited to a side bet',
-            body: BET_LABELS[data.type],
-            roundId,
-            sideBetId: ref.id,
-          })
-        )
-      )
-    }
-
     return ref.id
   },
 
@@ -94,20 +69,13 @@ export const sideBetService = {
     roundId: string,
     sideBetId: string,
     uid: string,
-    creatorUid: string,
-    betType: SideBetType,
+    _creatorUid: string,
+    _betType: SideBetType,
   ): Promise<void> {
     await updateDoc(sideBetDocPath(roundId, sideBetId), {
       participantIds: arrayUnion(uid),
       invitedIds: arrayRemove(uid),
       updatedAt: serverTimestamp(),
-    })
-    void notificationService.createNotification(creatorUid, {
-      type: 'bet_accepted',
-      title: 'Your side bet invite was accepted',
-      body: BET_LABELS[betType],
-      roundId,
-      sideBetId,
     })
   },
 
@@ -130,24 +98,13 @@ export const sideBetService = {
     roundId: string,
     sideBetId: string,
     uid: string,
-    existingParticipantIds: string[],
-    betType: SideBetType,
+    _existingParticipantIds: string[],
+    _betType: SideBetType,
   ): Promise<void> {
     await updateDoc(sideBetDocPath(roundId, sideBetId), {
       participantIds: arrayUnion(uid),
       updatedAt: serverTimestamp(),
     })
-    void Promise.all(
-      existingParticipantIds.map((pid) =>
-        notificationService.createNotification(pid, {
-          type: 'bet_joined',
-          title: 'Someone joined your side bet',
-          body: BET_LABELS[betType],
-          roundId,
-          sideBetId,
-        })
-      )
-    )
   },
 
   async cancelSideBet(roundId: string, sideBetId: string): Promise<void> {
@@ -226,21 +183,5 @@ export const sideBetService = {
     }
 
     await batch.commit()
-
-    void Promise.all(
-      settleableBets
-        .filter((bet) => bet.participantIds.length >= 2)
-        .flatMap((bet) =>
-          bet.participantIds.map((uid) =>
-            notificationService.createNotification(uid, {
-              type: 'bet_settled',
-              title: 'A side bet was settled',
-              body: BET_LABELS[bet.type],
-              roundId,
-              sideBetId: bet.sideBetId,
-            })
-          )
-        )
-    )
   },
 }

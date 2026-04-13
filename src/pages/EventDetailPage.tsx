@@ -1,23 +1,36 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useEvent } from '@/hooks/useEvent'
-import { useRound } from '@/hooks/useRound'
 import { RoundCard } from '@/components/round/RoundCard'
-import { Spinner, Alert, Badge, Card, Button, Input } from '@/components/ui'
-import { InviteModal } from '@/components/event/InviteModal'
-import { formatDate, formatHandicap } from '@/lib/formatters'
+import { Spinner, Alert, Card, Button, Input } from '@/components/ui'
+import { formatHandicap } from '@/lib/formatters'
 import { useAuth } from '@/hooks/useAuth'
 import { eventService } from '@/services/eventService'
+import { roundService } from '@/services/roundService'
 import { userService } from '@/services/userService'
-import type { UserProfile } from '@/types'
+import type { Round, UserProfile } from '@/types'
 
 export function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const { event, loading } = useEvent(eventId!)
-  const { currentUser } = useAuth()
+  const { currentUser, userProfile } = useAuth()
+  const navigate = useNavigate()
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
-  const [showInvite, setShowInvite] = useState(false)
+  const [rounds, setRounds] = useState<Round[]>([])
+  const [roundsLoading, setRoundsLoading] = useState(false)
+  const [participantsOpen, setParticipantsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!event || event.roundIds.length === 0) { setRounds([]); return }
+    setRoundsLoading(true)
+    Promise.all(event.roundIds.map((rid) => roundService.getRound(rid))).then((results) => {
+      const loaded = results.filter(Boolean) as Round[]
+      loaded.sort((a, b) => a.date.seconds - b.date.seconds)
+      setRounds(loaded)
+      setRoundsLoading(false)
+    })
+  }, [event?.roundIds.join(',')])
 
   if (loading) {
     return (
@@ -33,12 +46,12 @@ export function EventDetailPage() {
   const isMember = event.memberIds?.includes(uid)
   const isCreator = event.createdBy === uid
 
-  // Block access to private events for non-members/non-creators
+  const isAdmin = userProfile?.isAdmin ?? false
   if (event.isPrivate && !isMember && !isCreator) {
     return (
       <div className="flex flex-col items-center justify-center pt-16 gap-3">
-        <p className="text-white font-semibold">This event is private.</p>
-        <p className="text-sm text-gray-400">You need an invitation to view this event.</p>
+        <p className="text-brand font-semibold">This event is private.</p>
+        <p className="text-sm text-muted">You need an invitation to view this event.</p>
       </div>
     )
   }
@@ -55,41 +68,9 @@ export function EventDetailPage() {
     }
   }
 
-  const statusVariant = { upcoming: 'yellow', active: 'green', completed: 'gray' } as const
-
   return (
     <div className="flex flex-col gap-4">
       {error && <Alert message={error} />}
-
-      {showInvite && (
-        <InviteModal
-          targetType="event"
-          targetId={event.eventId}
-          createdBy={uid}
-          targetName={event.name}
-          onClose={() => setShowInvite(false)}
-        />
-      )}
-
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1 mr-3">
-            <h1 className="text-xl font-bold text-white">{event.name}</h1>
-            {event.description && (
-              <p className="text-gray-400 text-sm mt-0.5">{event.description}</p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <Badge label={event.status} variant={statusVariant[event.status]} />
-            <Badge label={isMember ? 'Joined' : 'Not joined'} variant={isMember ? 'green' : 'yellow'} />
-          </div>
-        </div>
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className="text-xs text-gray-500">{formatDate(event.date)}</span>
-          <Badge label={event.type === 'single_round' ? 'Single Round' : 'Multi Round'} variant="gray" />
-          {event.isPrivate && <Badge label="Private" variant="purple" />}
-        </div>
-      </div>
 
       {/* Join button for public events */}
       {!isMember && !event.isPrivate && event.status !== 'completed' && (
@@ -99,22 +80,28 @@ export function EventDetailPage() {
       )}
 
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
+        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">
           Rounds ({event.roundIds.length})
         </h2>
-        {event.roundIds.length === 0 ? (
-          <Card className="p-4 text-center text-gray-500 text-sm">No rounds yet.</Card>
-        ) : (
+        {roundsLoading ? (
           <div className="flex flex-col gap-3">
             {event.roundIds.map((rid) => (
-              <RoundDetailRow key={rid} roundId={rid} currentUserId={uid} />
+              <div key={rid} className="h-16 bg-card-bg rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : rounds.length === 0 ? (
+          <Card className="p-4 text-center text-muted text-sm">No rounds yet.</Card>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {rounds.map((round) => (
+              <RoundCard key={round.roundId} round={round} currentUserId={uid} />
             ))}
           </div>
         )}
         {isCreator && (
           <Link
-            to="/rounds/new"
-            className="mt-3 flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors text-base"
+            to={`/rounds/new/full?eventId=${event.eventId}`}
+            className="mt-3 flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-semibold transition-colors text-base"
           >
             + Add Round
           </Link>
@@ -124,27 +111,44 @@ export function EventDetailPage() {
       {/* Participants & handicaps */}
       {event.memberIds?.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            Participants ({event.memberIds.length})
-          </h2>
-          <Card className="divide-y divide-gray-700">
-            {event.memberIds.map((id) => (
-              <ParticipantRow
-                key={id}
-                uid={id}
-                handicap={event.handicaps[id] ?? 0}
-                eventId={event.eventId}
-                canEdit={isCreator && event.status === 'upcoming'}
-              />
-            ))}
-          </Card>
+          <button
+            type="button"
+            onClick={() => setParticipantsOpen((o) => !o)}
+            className="w-full flex items-center justify-between mb-3"
+          >
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
+              Participants ({event.memberIds.length})
+            </h2>
+            <svg
+              className={`w-4 h-4 text-muted transition-transform ${participantsOpen ? 'rotate-180' : ''}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              strokeLinecap="round" strokeLinejoin="round"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {participantsOpen && (
+            <Card className="divide-y divide-card-border">
+              {event.memberIds.map((id) => (
+                <ParticipantRow
+                  key={id}
+                  uid={id}
+                  handicap={event.handicaps[id] ?? 0}
+                  eventId={event.eventId}
+                  canEdit={isCreator && event.status === 'upcoming'}
+                  canRemove={isAdmin && id !== uid}
+                  showRemove={isAdmin}
+                />
+              ))}
+            </Card>
+          )}
         </div>
       )}
 
       {isCreator && (
         <button
-          onClick={() => setShowInvite(true)}
-          className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors text-base"
+          onClick={() => navigate(`/invite-golfers?targetType=event&targetId=${event.eventId}`)}
+          className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-semibold transition-colors text-base"
         >
           + Invite Participants
         </button>
@@ -158,15 +162,20 @@ function ParticipantRow({
   handicap,
   eventId,
   canEdit,
+  canRemove,
+  showRemove,
 }: {
   uid: string
   handicap: number
   eventId: string
   canEdit: boolean
+  canRemove: boolean
+  showRemove: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(String(handicap))
   const [saving, setSaving] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
@@ -182,9 +191,15 @@ function ParticipantRow({
     setEditing(false)
   }
 
+  async function handleRemove() {
+    setRemoving(true)
+    await eventService.removeParticipant(eventId, uid)
+    setRemoving(false)
+  }
+
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-sm text-white">{profile?.displayName ?? '…'}</span>
+      <span className="text-sm text-brand">{profile?.displayName ?? '…'}</span>
       <div className="flex items-center gap-2 shrink-0">
         {editing ? (
           <>
@@ -200,20 +215,24 @@ function ParticipantRow({
           </>
         ) : (
           <>
-            <span className="text-sm text-white">HCP {formatHandicap(handicap)}</span>
+            <span className="text-sm text-brand">HCP {formatHandicap(handicap)}</span>
             {canEdit && (
               <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
+            )}
+            {(canRemove || showRemove) && (
+              <button
+                onClick={canRemove ? handleRemove : undefined}
+                disabled={!canRemove || removing}
+                className="w-7 h-7 rounded-full bg-danger hover:bg-danger-hover disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
             )}
           </>
         )}
       </div>
     </div>
   )
-}
-
-function RoundDetailRow({ roundId, currentUserId }: { roundId: string; currentUserId: string }) {
-  const { round, loading } = useRound(roundId)
-  if (loading) return <div className="h-16 bg-gray-800 rounded-xl animate-pulse" />
-  if (!round) return null
-  return <RoundCard round={round} currentUserId={currentUserId} />
 }

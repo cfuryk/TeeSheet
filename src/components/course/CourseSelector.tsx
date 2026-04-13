@@ -80,22 +80,22 @@ export function CourseSelector({ value, onChange, onImport, error, label = 'Cour
           label={label}
           value={value}
           onChange={onChange}
-          options={[...courses].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ value: c.courseId, label: c.name }))}
+          options={[...courses].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '')).map((c) => ({ value: c.courseId, label: c.name }))}
           placeholder="Select a course"
           error={error}
           dropdownFooter={(close) => (
             <button
               type="button"
               onMouseDown={(e) => { e.preventDefault(); close(); setShowImport(true) }}
-              className="w-full px-3 py-2 text-sm text-green-400 hover:text-green-300 hover:bg-gray-700 text-left transition-colors"
+              className="w-full px-3 py-2 text-sm text-brand hover:text-brand hover:bg-card-bg text-left transition-colors"
             >
               + Course not listed? Search &amp; add it
             </button>
           )}
         />
       ) : (
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-700 bg-gray-800 p-4">
-          {importError && <p className="text-sm text-red-400">{importError}</p>}
+        <div className="flex flex-col gap-3 rounded-xl border border-card-border bg-card-bg p-4">
+          {importError && <p className="text-sm text-danger">{importError}</p>}
 
           {importStep === 'search' && (
             <>
@@ -153,7 +153,7 @@ export function CourseSelector({ value, onChange, onImport, error, label = 'Cour
           {importStep === 'saving' && (
             <div className="flex items-center justify-center gap-3 py-6">
               <Spinner size="sm" />
-              <p className="text-gray-400 text-sm">Saving course...</p>
+              <p className="text-muted text-sm">Saving course...</p>
             </div>
           )}
         </div>

@@ -87,7 +87,7 @@ export function CourseDetailPage() {
 
     return (
       <div className="flex flex-col gap-4">
-        <h2 className="text-xl font-bold text-white">{course.name}</h2>
+        <h2 className="text-xl font-bold text-brand">{course.name}</h2>
 
         <TeeList
           course={course}
@@ -130,7 +130,7 @@ export function CourseDetailPage() {
   // ── New course — API import flow ─────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-white">Add Course</h2>
+      <h2 className="text-xl font-bold text-brand">Add Course</h2>
 
       {error && <Alert message={error} />}
 
@@ -171,7 +171,7 @@ export function CourseDetailPage() {
       {step === 'saving' && (
         <div className="flex flex-col items-center gap-3 py-12">
           <Spinner size="lg" />
-          <p className="text-gray-400">Saving course...</p>
+          <p className="text-muted">Saving course...</p>
         </div>
       )}
     </div>

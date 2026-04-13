@@ -57,19 +57,19 @@ export function CourseSearchBox({ onSelect }: Props) {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       {searched && results.length === 0 && !loading && (
-        <p className="text-sm text-gray-500 text-center py-2">No courses found for "{query}"</p>
+        <p className="text-sm text-muted text-center py-2">No courses found for "{query}"</p>
       )}
 
       {results.length > 0 && (
-        <div className="flex flex-col gap-1 max-h-64 overflow-y-auto rounded-xl border border-gray-700">
+        <div className="flex flex-col gap-1 max-h-64 overflow-y-auto rounded-xl border border-card-border">
           {results.map((course) => (
             <button
               key={course.id}
               onClick={() => { onSelect(course); setResults([]); setQuery('') }}
-              className="text-left px-4 py-3 hover:bg-gray-700 transition-colors border-b border-gray-700 last:border-0"
+              className="text-left px-4 py-3 hover:bg-card-bg transition-colors border-b border-card-border last:border-0"
             >
-              <p className="font-medium text-white text-sm">{displayCourseName(course)}</p>
-              <p className="text-xs text-gray-400">
+              <p className="font-medium text-brand text-sm">{displayCourseName(course)}</p>
+              <p className="text-xs text-muted">
                 {[course.location.city, course.location.state, course.location.country]
                   .filter(Boolean)
                   .join(', ')}

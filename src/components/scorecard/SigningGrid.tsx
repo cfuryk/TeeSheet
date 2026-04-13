@@ -26,29 +26,29 @@ export function SigningGrid({ scores, holes, currentUserId, roundId, groupId, on
         const totalVsPar = calculateTotalVsPar(sc.scores, holes)
 
         return (
-          <div key={sc.golferId} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+          <div key={sc.golferId} className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
             {/* Golfer header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-              <span className="font-semibold text-white">{sc.golferName}</span>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-card-border">
+              <span className="font-semibold text-brand">{sc.golferName}</span>
               <div className="flex items-center gap-3">
                 {sc.totalGross !== null && sc.totalGross !== undefined && totalVsPar !== null && (
-                  <span className="text-sm font-bold text-gray-400">
+                  <span className="text-sm font-bold text-muted">
                     {formatVsPar(totalVsPar)}
-                    <span className="text-gray-600 mx-1">·</span>
-                    <span className="text-white">{sc.totalGross}</span>
+                    <span className="text-muted mx-1">·</span>
+                    <span className="text-brand">{sc.totalGross}</span>
                   </span>
                 )}
                 {sc.isLocked
                   ? <Badge label="Signed ✓" variant="green" />
                   : sc.golferId === currentUserId
                     ? null
-                    : <span className="text-xs text-gray-500">Awaiting sign</span>
+                    : <span className="text-xs text-muted">Awaiting sign</span>
                 }
               </div>
             </div>
 
             {/* Hole rows */}
-            <div className="divide-y divide-gray-700/50">
+            <div className="divide-y divide-card-border/50">
               {sorted.map((h) => {
                 const s = sc.scores.find((x) => x.hole === h.number)
                 const vp = s ? scoreVsPar(s.grossScore, h.par) : null
@@ -72,15 +72,15 @@ export function SigningGrid({ scores, holes, currentUserId, roundId, groupId, on
             </div>
 
             {/* Total row */}
-            <div className="flex items-center px-4 py-2 border-t border-gray-700 bg-gray-700/30">
-              <span className="text-sm font-semibold text-gray-300">Total</span>
-              <span className="ml-auto text-sm font-bold text-gray-400 mr-4">Par {totalPar}</span>
-              <span className="text-sm font-bold text-white">{sc.totalGross ?? '-'}</span>
+            <div className="flex items-center px-4 py-2 border-t border-card-border bg-card-bg">
+              <span className="text-sm font-semibold text-brand">Total</span>
+              <span className="ml-auto text-sm font-bold text-muted mr-4">Par {totalPar}</span>
+              <span className="text-sm font-bold text-brand">{sc.totalGross ?? '-'}</span>
             </div>
 
             {/* Sign button */}
             {!sc.isLocked && sc.golferId === currentUserId && (
-              <div className="px-4 py-3 border-t border-gray-700">
+              <div className="px-4 py-3 border-t border-card-border">
                 <Button
                   loading={signing === sc.golferId}
                   onClick={() => onSign(sc.golferId)}
@@ -151,17 +151,17 @@ function HoleRow({
 
   return (
     <div
-      className={`flex flex-col divide-y divide-gray-700/30 ${canEdit && !editing ? 'cursor-pointer active:bg-gray-700/40' : ''}`}
+      className={`flex flex-col divide-y divide-card-border/30 ${canEdit && !editing ? 'cursor-pointer active:bg-card-bg' : ''}`}
       onClick={() => !editing && startEditing()}
     >
       <div className="relative flex items-center px-4 py-2 text-sm">
-        <span className="w-16 text-gray-400">Hole {hole.number}</span>
-        <span className="w-12 text-gray-500 text-center">Par {hole.par}</span>
+        <span className="w-16 text-muted">Hole {hole.number}</span>
+        <span className="w-12 text-muted text-center">Par {hole.par}</span>
         {isNet && strokes > 0 && (
-          <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-green-400" />
+          <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-brand" />
         )}
         {saving ? (
-          <span className="ml-auto text-xs text-gray-500">Saving…</span>
+          <span className="ml-auto text-xs text-muted">Saving…</span>
         ) : (
           <ScoreBadge score={score} vsPar={vsPar} />
         )}
@@ -177,18 +177,18 @@ function HoleRow({
             onChange={(e) => setInputVal(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
-            className="w-full text-center bg-gray-700 border border-green-500 rounded-lg text-white font-mono font-semibold py-2 text-lg focus:outline-none"
+            className="w-full text-center bg-white border border-brand rounded-lg text-brand font-mono font-semibold py-2 text-lg focus:outline-none"
           />
           <div className="flex gap-2">
             <button
               onClick={handleCommit}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+              className="flex-1 bg-brand hover:bg-brand-hover text-white font-semibold py-2 rounded-lg text-sm transition-colors"
             >
               OK
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 rounded-lg text-sm transition-colors"
+              className="flex-1 bg-card-bg hover:bg-card-bg text-brand font-semibold py-2 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
@@ -202,13 +202,13 @@ function HoleRow({
 function ScoreBadge({ score, vsPar, noMargin = false }: { score: number | null; vsPar: number | null; noMargin?: boolean }) {
   const margin = noMargin ? '' : 'ml-auto'
   if (score === null || vsPar === null) {
-    return <span className={`${margin} font-mono text-gray-600`}>-</span>
+    return <span className={`${margin} font-mono text-muted`}>-</span>
   }
 
   // Eagle or better: red, double circle
   if (vsPar <= -2) {
     return (
-      <span className={`${margin} inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-red-400 outline-offset-[-6px]`}>
+      <span className={`${margin} inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-red-400 rounded-full ring-2 ring-red-400 ring-offset-2 ring-offset-white outline outline-2 outline-red-400 outline-offset-[-6px]`}>
         {score}
       </span>
     )
@@ -221,9 +221,9 @@ function ScoreBadge({ score, vsPar, noMargin = false }: { score: number | null; 
       </span>
     )
   }
-  // Par: plain white
+  // Par: plain brand
   if (vsPar === 0) {
-    return <span className={`${margin} inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-gray-200`}>{score}</span>
+    return <span className={`${margin} inline-flex items-center justify-center w-7 h-7 font-mono font-semibold text-brand`}>{score}</span>
   }
   // Bogey: blue, single square
   if (vsPar === 1) {
@@ -235,7 +235,7 @@ function ScoreBadge({ score, vsPar, noMargin = false }: { score: number | null; 
   }
   // Double bogey or worse: blue, double square
   return (
-    <span className={`${margin} inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 outline outline-2 outline-blue-400 outline-offset-[-6px]`}>
+    <span className={`${margin} inline-flex items-center justify-center w-8 h-8 font-mono font-semibold text-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-white outline outline-2 outline-blue-400 outline-offset-[-6px]`}>
       {score}
     </span>
   )

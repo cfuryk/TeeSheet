@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   Timestamp,
   arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { GolfEvent, EventFormData, EventStatus } from '@/types'
@@ -82,6 +83,40 @@ export const eventService = {
     await updateDoc(doc(db, 'events', eventId), {
       memberIds: arrayUnion(uid),
       [`handicaps.${uid}`]: handicap,
+      updatedAt: serverTimestamp(),
+    })
+    // Cascade new member to all existing rounds in the event
+    await this.cascadeMemberToRounds(eventId, [uid])
+  },
+
+  /** Add one or more uids to the memberIds of every round in an event. */
+  async cascadeMemberToRounds(eventId: string, uids: string[]): Promise<void> {
+    const event = await this.getEvent(eventId)
+    if (!event || event.roundIds.length === 0) return
+    await Promise.all(
+      event.roundIds.map((roundId) =>
+        updateDoc(doc(db, 'rounds', roundId), {
+          memberIds: arrayUnion(...uids),
+          updatedAt: serverTimestamp(),
+        })
+      )
+    )
+  },
+
+  /** Add all current event members to a newly created round. */
+  async cascadeEventMembersToRound(eventId: string, roundId: string): Promise<void> {
+    const event = await this.getEvent(eventId)
+    if (!event || event.memberIds.length === 0) return
+    await updateDoc(doc(db, 'rounds', roundId), {
+      memberIds: arrayUnion(...event.memberIds),
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  async removeParticipant(eventId: string, uid: string): Promise<void> {
+    await updateDoc(doc(db, 'events', eventId), {
+      memberIds: arrayRemove(uid),
+      [`handicaps.${uid}`]: null,
       updatedAt: serverTimestamp(),
     })
   },

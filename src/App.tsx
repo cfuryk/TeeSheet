@@ -32,7 +32,6 @@ import { AdminRoundsPage } from '@/pages/admin/AdminRoundsPage'
 import { AdminEventsPage } from '@/pages/admin/AdminEventsPage'
 import { AdminScoresPage } from '@/pages/admin/AdminScoresPage'
 import { AdminBetsPage } from '@/pages/admin/AdminBetsPage'
-import { InvitePage } from '@/pages/InvitePage'
 import { InviteGolfersPage } from '@/pages/InviteGolfersPage'
 import { SideBetsPage } from '@/pages/SideBetsPage'
 import { SideBetDetailPage } from '@/pages/SideBetDetailPage'
@@ -47,10 +46,10 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* AppShell wraps all page routes; home is public */}
+          {/* AppShell wraps all page routes */}
           <Route element={<AppShell />}>
-            {/* Public home */}
-            <Route path="/" element={<TeeSheetPage />} />
+            {/* Protected home */}
+            <Route path="/" element={<ProtectedRoute><TeeSheetPage /></ProtectedRoute>} />
 
             {/* Protected routes */}
             <Route path="/rounds/new" element={<ProtectedRoute><CreateRoundChoicePage /></ProtectedRoute>} />
@@ -89,7 +88,6 @@ export default function App() {
             <Route path="/admin/scores" element={<ProtectedRoute requireAdmin><AdminScoresPage /></ProtectedRoute>} />
             <Route path="/admin/bets" element={<ProtectedRoute requireAdmin><AdminBetsPage /></ProtectedRoute>} />
 
-            <Route path="/invite/:token" element={<InvitePage />} />
             <Route path="/invite-golfers" element={<ProtectedRoute><InviteGolfersPage /></ProtectedRoute>} />
           </Route>
 

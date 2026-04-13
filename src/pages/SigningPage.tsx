@@ -4,14 +4,14 @@ import { useAuth } from '@/hooks/useAuth'
 import { useScore } from '@/hooks/useScore'
 import { scoreService } from '@/services/scoreService'
 import { groupService } from '@/services/groupService'
-import { SigningGrid } from '@/components/scorecard/SigningGrid'
+import { ScorecardGrid } from '@/components/scorecard/ScorecardGrid'
 import { Spinner, Alert, Button } from '@/components/ui'
 
 export function SigningPage() {
   const { roundId, groupId } = useParams<{ roundId: string; groupId: string }>()
   const { currentUser } = useAuth()
   const { ctx, loading } = useScore(roundId!, groupId!)
-  const [signing, setSigning] = useState<string | null>(null)
+  const [signing, setSigning] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
@@ -29,35 +29,72 @@ export function SigningPage() {
   const { round, group, scores, tee } = ctx
   const signedCount = scores.filter((s) => s.isLocked).length
   const allSigned = signedCount === group.golferIds.length
+  const isNet = round.roundType.includes('NET')
 
-  async function handleSign(targetUid: string) {
-    if (targetUid !== uid) return
-    setSigning(targetUid)
+  async function handleSign() {
+    setSigning(true)
     setError('')
     try {
-      await scoreService.signScore(roundId!, groupId!, targetUid, uid)
+      await scoreService.signScore(roundId!, groupId!, uid, uid)
       await groupService.checkAndCompleteGroup(roundId!, groupId!)
+      navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
     } catch (e) {
       setError((e as Error).message)
-    } finally {
-      setSigning(null)
+      setSigning(false)
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-white">Sign Scorecard</h1>
-        <p className="text-gray-400 text-sm mt-0.5">{round.courseName} · {round.teeName}</p>
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex-1 bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-green-500 h-2 rounded-full transition-all"
-              style={{ width: `${(signedCount / group.golferIds.length) * 100}%` }}
-            />
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={() => navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)}
+        className="w-full py-3 rounded-xl bg-brand hover:bg-brand-hover text-white font-semibold text-sm transition-colors"
+      >
+        Back to Round
+      </button>
+
+      {/* Header + signing actions */}
+      <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+        <div className="p-4">
+          <h1 className="text-xl font-bold text-brand">Sign Scorecard</h1>
+          <p className="text-muted text-sm mt-0.5">{round.courseName} · {round.teeName}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex-1 bg-card-border rounded-full h-2">
+              <div
+                className="bg-brand h-2 rounded-full transition-all"
+                style={{ width: `${(signedCount / group.golferIds.length) * 100}%` }}
+              />
+            </div>
+            <span className="text-sm text-muted">{signedCount}/{group.golferIds.length}</span>
           </div>
-          <span className="text-sm text-gray-400">{signedCount}/{group.golferIds.length}</span>
         </div>
+        {!allSigned && (
+          <div className="border-t border-card-border divide-y divide-card-border">
+            {scores.map((sc) => (
+              <div key={sc.golferId} className="flex items-center justify-between px-4 py-3">
+                <span className="font-semibold text-brand text-sm">{sc.golferName}</span>
+                {sc.isLocked ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-danger text-xl" style={{ fontFamily: "'Dancing Script', cursive" }}>
+                      {sc.golferName}
+                    </span>
+                    <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                ) : sc.golferId === uid ? (
+                  <Button size="sm" loading={signing} onClick={handleSign}>
+                    Sign My Card
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted">Awaiting signature</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && <Alert message={error} />}
@@ -65,25 +102,22 @@ export function SigningPage() {
       {allSigned ? (
         <div className="flex flex-col items-center gap-4 py-8">
           <div className="text-5xl">✓</div>
-          <p className="text-xl font-bold text-green-400">All Signed!</p>
-          <p className="text-gray-400 text-sm">Scores are locked.</p>
+          <p className="text-xl font-bold text-brand">All Signed!</p>
+          <p className="text-muted text-sm">Scores are locked.</p>
           <Button onClick={() => navigate(`/rounds/${roundId}/summary`)}>
             View Summary
           </Button>
         </div>
       ) : (
         <>
-          <SigningGrid
-            scores={scores}
-            holes={tee.holes}
-            currentUserId={uid}
-            roundId={roundId!}
-            groupId={groupId!}
-            onSign={handleSign}
-            signing={signing}
-            isNet={round.roundType.includes('NET')}
-          />
-          <p className="text-xs text-gray-500 text-center px-2">
+          {/* Aggregate scorecard */}
+          <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+            <div className="p-4">
+              <ScorecardGrid scores={scores} holes={tee.holes} isNet={isNet} bare />
+            </div>
+          </div>
+
+          <p className="text-xs text-muted text-center px-2">
             Round chat is automatically deleted 7 days after the round ends.
           </p>
         </>

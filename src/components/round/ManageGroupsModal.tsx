@@ -3,7 +3,7 @@ import type { Group } from '@/types'
 import type { UserProfile } from '@/types'
 import { userService } from '@/services/userService'
 import { groupService } from '@/services/groupService'
-import { Button, SelectField } from '@/components/ui'
+import { Button } from '@/components/ui'
 
 interface Props {
   roundId: string
@@ -11,12 +11,17 @@ interface Props {
   onClose: () => void
 }
 
+interface Selection {
+  golferId: string
+  groupId: string
+}
+
 export function ManageGroupsModal({ roundId, groups, onClose }: Props) {
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({})
-  const [moving, setMoving] = useState<string | null>(null) // golferId being moved
+  const [selected, setSelected] = useState<Selection | null>(null)
+  const [swapping, setSwapping] = useState(false)
   const [error, setError] = useState('')
 
-  // Load all profiles for everyone in any group
   useEffect(() => {
     const allIds = [...new Set(groups.flatMap((g) => g.golferIds))]
     Promise.all(allIds.map((uid) => userService.getProfile(uid).then((p) => ({ uid, p })))).then(
@@ -30,35 +35,51 @@ export function ManageGroupsModal({ roundId, groups, onClose }: Props) {
     )
   }, [groups])
 
-  async function handleMove(golferId: string, fromGroupId: string, toGroupId: string) {
-    if (!toGroupId || toGroupId === fromGroupId) return
-    setMoving(golferId)
+  async function handleTap(golferId: string, groupId: string) {
+    if (swapping) return
     setError('')
+
+    if (!selected) {
+      // First tap — select
+      setSelected({ golferId, groupId })
+      return
+    }
+
+    if (selected.golferId === golferId) {
+      // Tap same person — deselect
+      setSelected(null)
+      return
+    }
+
+    // Tap different person — swap
+    setSwapping(true)
     try {
-      await groupService.moveGolfer(roundId, fromGroupId, toGroupId, golferId)
-      // Auto-delete the source group if it is now empty
-      const fromGroup = groups.find((g) => g.groupId === fromGroupId)
-      if (fromGroup && fromGroup.golferIds.length === 1) {
-        // The one golfer was just moved out — delete the group
-        await groupService.deleteGroup(roundId, fromGroupId)
-      }
+      await groupService.swapGolfers(roundId, selected, { golferId, groupId })
     } catch {
-      setError('Failed to move player.')
+      setError('Failed to swap players.')
     } finally {
-      setMoving(null)
+      setSwapping(false)
+      setSelected(null)
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 pb-4">
-      <div className="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl flex flex-col max-h-[80vh]">
+      <div className="w-full max-w-lg bg-white border border-card-border rounded-2xl flex flex-col max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700 shrink-0">
-          <h2 className="font-bold text-white text-lg">Manage Groups</h2>
+        <div className="flex items-center justify-between p-4 border-b border-card-border shrink-0">
+          <div>
+            <h2 className="font-bold text-brand text-lg">Manage Groups</h2>
+            <p className="text-xs text-muted mt-0.5">
+              {selected
+                ? `${profiles[selected.golferId]?.displayName ?? '…'} selected — tap another player to swap`
+                : 'Tap a player to select, then tap another to swap'}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors text-2xl leading-none"
+            className="text-muted hover:text-brand transition-colors text-2xl leading-none ml-3"
           >
             ×
           </button>
@@ -66,43 +87,35 @@ export function ManageGroupsModal({ roundId, groups, onClose }: Props) {
 
         {/* Body */}
         <div className="overflow-y-auto p-4 flex flex-col gap-4">
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           {groups.map((group) => (
-            <div key={group.groupId} className="bg-gray-800 border border-gray-700 rounded-xl p-3">
-              <p className="font-semibold text-white mb-2">{group.name ?? 'Group'}</p>
+            <div key={group.groupId} className="bg-card-bg border border-card-border rounded-xl p-3">
+              <p className="font-semibold text-brand mb-2">{group.name ?? 'Group'}</p>
 
               {group.golferIds.length === 0 ? (
-                <p className="text-xs text-gray-500">No players</p>
+                <p className="text-xs text-muted">No players</p>
               ) : (
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {group.golferIds.map((gid) => {
-                    const profile = profiles[gid]
-                    const targetOptions = groups
-                      .filter((g) => g.groupId !== group.groupId && g.golferIds.length < 4)
-                      .map((g) => ({ value: g.groupId, label: g.name ?? 'Group' }))
-
+                    const isSelected = selected?.golferId === gid
+                    const name = profiles[gid]?.displayName ?? '…'
                     return (
-                      <div key={gid} className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                          {profile?.displayName?.[0]?.toUpperCase() ?? '?'}
-                        </div>
-                        <span className="flex-1 text-sm text-white truncate">
-                          {profile?.displayName ?? 'Loading...'}
-                        </span>
-                        {targetOptions.length > 0 ? (
-                          <SelectField
-                            options={targetOptions}
-                            placeholder="Move to…"
-                            value=""
-                            onChange={(toGroupId) => handleMove(gid, group.groupId, toGroupId)}
-                            disabled={moving === gid}
-                            className="w-36 shrink-0"
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-600 w-36 shrink-0 text-right">No other groups</span>
-                        )}
-                      </div>
+                      <button
+                        key={gid}
+                        type="button"
+                        onClick={() => handleTap(gid, group.groupId)}
+                        disabled={swapping}
+                        className={[
+                          'px-3 py-2 rounded-lg text-xs font-semibold truncate transition-colors text-left',
+                          isSelected
+                            ? 'bg-brand text-white ring-2 ring-brand ring-offset-1'
+                            : 'bg-brand/10 text-brand hover:bg-brand/20',
+                          swapping ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                        ].join(' ')}
+                      >
+                        {name}
+                      </button>
                     )
                   })}
                 </div>
@@ -111,7 +124,7 @@ export function ManageGroupsModal({ roundId, groups, onClose }: Props) {
           ))}
         </div>
 
-        <div className="p-4 border-t border-gray-700 shrink-0">
+        <div className="p-4 border-t border-card-border shrink-0">
           <Button variant="secondary" onClick={onClose} className="w-full">
             Done
           </Button>

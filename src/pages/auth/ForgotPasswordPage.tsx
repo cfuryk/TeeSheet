@@ -25,9 +25,9 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-black text-white text-center mb-8">Reset Password</h1>
+        <h1 className="text-3xl font-black text-brand text-center mb-8">Reset Password</h1>
 
         {sent ? (
           <Alert message="Check your email for a password reset link." type="success" />
@@ -41,8 +41,8 @@ export function ForgotPasswordPage() {
           </form>
         )}
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          <Link to="/login" className="text-green-400 hover:text-green-300">
+        <p className="mt-6 text-center text-sm text-muted">
+          <Link to="/login" className="text-brand hover:text-brand/70">
             Back to Sign In
           </Link>
         </p>

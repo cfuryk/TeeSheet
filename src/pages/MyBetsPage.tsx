@@ -176,11 +176,11 @@ export function MyBetsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-white">My Bets</h1>
+      <h1 className="text-2xl font-bold text-brand">My Bets</h1>
 
       {/* Aggregate */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span className="text-sm text-gray-400 font-medium">Net Winnings</span>
+      <div className="bg-card-bg border border-card-border rounded-xl px-4 py-3 flex items-center justify-between">
+        <span className="text-sm text-muted font-medium">Net Winnings</span>
         <span className={`text-lg font-bold ${aggregateColor}`}>{aggregateLabel}</span>
       </div>
 
@@ -193,7 +193,7 @@ export function MyBetsPage() {
           {/* Round Bets */}
           {wagerRounds.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Round Bets</h2>
+              <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Round Bets</h2>
               <div className="flex flex-col gap-3">
                 {wagerRounds.map((round) => {
                   const scores = roundScores[round.roundId]
@@ -219,16 +219,16 @@ export function MyBetsPage() {
                       key={round.roundId}
                       type="button"
                       onClick={() => navigate(`/rounds/${round.roundId}`)}
-                      className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between gap-3 hover:border-blue-600/50 transition-colors"
+                      className="w-full text-left bg-card-bg border border-card-border rounded-xl p-4 flex items-center justify-between gap-3 hover:border-blue-600/50 transition-colors"
                     >
                       <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-sm font-semibold text-white truncate">{round.name}</span>
-                        <span className="text-xs text-gray-400 truncate">{round.courseName}</span>
-                        <span className="text-xs text-gray-500">{dateStr}</span>
+                        <span className="text-sm font-semibold text-brand truncate">{round.name}</span>
+                        <span className="text-xs text-muted truncate">{round.courseName}</span>
+                        <span className="text-xs text-muted">{dateStr}</span>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         {moneyEl}
-                        <span className="text-xs text-gray-600">${round.wager!.toFixed(2)} ante</span>
+                        <span className="text-xs text-muted">${round.wager!.toFixed(2)} ante</span>
                       </div>
                     </button>
                   )
@@ -239,9 +239,9 @@ export function MyBetsPage() {
 
           {/* Side Bets */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Side Bets</h2>
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Side Bets</h2>
             {bets.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">You have no side bets yet.</p>
+              <p className="text-sm text-muted text-center py-4">You have no side bets yet.</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {bets.map((bet) => {
@@ -270,16 +270,16 @@ export function MyBetsPage() {
                       key={bet.sideBetId}
                       type="button"
                       onClick={() => navigate(`/rounds/${bet.roundId}/side-bets/${bet.sideBetId}`)}
-                      className="w-full text-left bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between gap-3 hover:border-blue-600/50 transition-colors"
+                      className="w-full text-left bg-card-bg border border-card-border rounded-xl p-4 flex items-center justify-between gap-3 hover:border-blue-600/50 transition-colors"
                     >
                       <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-sm font-semibold text-white truncate">
+                        <span className="text-sm font-semibold text-brand truncate">
                           {BET_TYPE_LABELS[bet.type]}
                         </span>
-                        <span className="text-xs text-gray-400 truncate">
+                        <span className="text-xs text-muted truncate">
                           {round?.courseName ?? '—'}
                         </span>
-                        <span className="text-xs text-gray-500">{dateStr}</span>
+                        <span className="text-xs text-muted">{dateStr}</span>
                       </div>
                       <div className="shrink-0">{moneyEl}</div>
                     </button>
@@ -290,7 +290,7 @@ export function MyBetsPage() {
           </section>
 
           {wagerRounds.length === 0 && bets.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-8">You have no bets yet.</p>
+            <p className="text-sm text-muted text-center py-8">You have no bets yet.</p>
           )}
         </>
       )}

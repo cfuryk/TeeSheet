@@ -36,16 +36,16 @@ export function ProfilePage() {
 
     return (
         <div className="flex flex-col gap-4">
-            <h2 className="text-xl font-bold text-white">Profile</h2>
+            <h2 className="text-xl font-bold text-brand">Profile</h2>
             <Card className="p-4">
                 <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
                     {error && <Alert message={error} />}
                     <Input label="Display Name" {...register('displayName')} error={errors.displayName?.message} />
-                    <div className="flex flex-col gap-1 text-sm text-gray-400">
+                    <div className="flex flex-col gap-1 text-sm text-muted">
                         <span>Email: {userProfile?.email}</span>
                         <span>
-                            TeeSheet Handicap:{' '}
-                            <span className="text-white font-medium">
+                            Handicap:{' '}
+                            <span className="text-brand font-medium">
                                 {userProfile?.teeSheetHandicap != null
                                     ? formatHandicap(userProfile.teeSheetHandicap)
                                     : 'Not enough rounds'}
