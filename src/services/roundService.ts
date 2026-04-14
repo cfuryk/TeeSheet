@@ -12,9 +12,11 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  arrayRemove,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { Round, RoundFormData, RoundStatus, Score } from '@/types'
+import type { Match } from '@/types/round'
 import { localDateFromString } from '@/lib/formatters'
 import { courseService } from './courseService'
 import { golferScoreService } from './golferScoreService'
@@ -45,6 +47,10 @@ export const roundService = {
     courseName: string,
     teeName: string,
     eventId: string | null = null,
+    match?: Match,
+    teeYardage?: number,
+    teeRating?: number,
+    teeSlope?: number,
   ): Promise<string> {
     const ref = await addDoc(collection(db, 'rounds'), {
       name: data.name,
@@ -52,6 +58,9 @@ export const roundService = {
       courseName,
       teeId: data.teeId,
       teeName,
+      ...(teeYardage != null ? { teeYardage } : {}),
+      ...(teeRating != null ? { teeRating } : {}),
+      ...(teeSlope != null ? { teeSlope } : {}),
       date: Timestamp.fromDate(localDateFromString(data.date)),
       scoringFormat: data.scoringFormat,
       roundType: data.roundType,
@@ -63,6 +72,7 @@ export const roundService = {
       memberIds: [],
       teamAssignments: null,
       ...(data.wager && data.wager > 0 ? { wager: data.wager } : {}),
+      ...(match ? { match } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
@@ -155,6 +165,16 @@ export const roundService = {
       )
       await Promise.all(scoresSnap.docs.map((d) => deleteDoc(d.ref)))
       await deleteDoc(groupDoc.ref)
+    }
+    // Remove roundId from its event (if any) before deleting the round doc
+    const roundSnap = await getDoc(doc(db, 'rounds', roundId))
+    if (roundSnap.exists()) {
+      const eventId = roundSnap.data().eventId
+      if (eventId) {
+        await updateDoc(doc(db, 'events', eventId), {
+          roundIds: arrayRemove(roundId),
+        })
+      }
     }
     // Delete the round doc last
     await deleteDoc(doc(db, 'rounds', roundId))

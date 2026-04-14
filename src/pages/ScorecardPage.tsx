@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { useScore } from '@/hooks/useScore'
+import { useGroups } from '@/hooks/useGroup'
 import { useAuth } from '@/hooks/useAuth'
 import { scoreService } from '@/services/scoreService'
 import { groupService } from '@/services/groupService'
@@ -12,6 +13,7 @@ import { userService } from '@/services/userService'
 import { HoleInfo } from '@/components/scorecard/HoleInfo'
 import { HoleNavigation } from '@/components/scorecard/HoleNavigation'
 import { GroupScoreSummary } from '@/components/scorecard/GroupScoreSummary'
+import { MatchScoreSummary } from '@/components/scorecard/MatchScoreSummary'
 import { ScorecardGrid } from '@/components/scorecard/ScorecardGrid'
 import { RoundChat } from '@/components/scorecard/RoundChat'
 import { Button, Spinner } from '@/components/ui'
@@ -76,6 +78,7 @@ function ScorecardGridCollapsible({ scores, holes, isNet }: { scores: Score[]; h
 export function ScorecardPage() {
   const { roundId, groupId } = useParams<{ roundId: string; groupId: string }>()
   const { ctx, loading } = useScore(roundId!, groupId!)
+  const { groups: allGroups } = useGroups(roundId!)
   const { currentUser, userProfile } = useAuth()
   const navigate = useNavigate()
   const allRoundScores = useRoundScores(roundId)
@@ -127,7 +130,7 @@ export function ScorecardPage() {
   const holeIndex = currentHole - 1
   const myStrokes = myScore?.strokeAllocation[holeIndex] ?? 0
   const myHoleScore = myScore?.scores.find((s) => s.hole === currentHole)
-  const isNetRound = round.roundType.includes('NET')
+  const isNetRound = round.roundType.includes('NET') || round.match?.scoring === 'NET'
 
   const myVsPar = myScore && myScore.scores.length > 0
     ? myScore.scores.reduce((sum, hs) => {
@@ -152,6 +155,7 @@ export function ScorecardPage() {
       onNext={() => setCurrentHole((h) => Math.min(18, h + 1))}
       allScored={allMyHolesScored && !isMyScoreLocked}
       onReview={() => navigate(`/rounds/${roundId}/groups/${groupId}/sign`)}
+      strokes={isNetRound && myScore && !isScramble ? myStrokes : 0}
     />
   )
 
@@ -241,7 +245,19 @@ export function ScorecardPage() {
       {!isSoloRound && (
         <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
       )}
-      {!isScramble && (
+      {!isScramble && round.match && (
+        <MatchScoreSummary
+          match={round.match}
+          groups={allGroups}
+          allScores={allRoundScores}
+          holes={tee.holes}
+          useNet={isNetRound}
+          roundId={roundId!}
+          groupId={groupId!}
+          currentUserId={currentUser!.uid}
+        />
+      )}
+      {!isScramble && !round.match && (
         <GroupScoreSummary scores={allRoundScores} holes={tee.holes} isNet={isNetRound} roundId={roundId!} groupId={groupId!} />
       )}
       {!isScramble && scores.length > 0 && (

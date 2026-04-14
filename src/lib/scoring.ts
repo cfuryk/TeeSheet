@@ -201,8 +201,40 @@ export function twoTeamAggregateScore(
 }
 
 /**
+ * Aggregate stroke match leaderboard for two teams.
+ * Returns each team's total score and the running difference through holes played.
+ * "up" means lower total (better in stroke play).
+ */
+export function aggregateStrokeMatchStatus(
+  teamAIds: string[],
+  teamBIds: string[],
+  allScores: Score[],
+  useNet: boolean,
+): { scoreA: number; scoreB: number; holesPlayed: number } {
+  const scoresA = allScores.filter((s) => teamAIds.includes(s.golferId))
+  const scoresB = allScores.filter((s) => teamBIds.includes(s.golferId))
+
+  const sumScores = (scores: Score[]) =>
+    scores.reduce((sum, sc) => {
+      const total = useNet
+        ? sc.scores.reduce((s, h) => s + h.netScore, 0)
+        : sc.scores.reduce((s, h) => s + h.grossScore, 0)
+      return sum + total
+    }, 0)
+
+  const holesPlayed = scoresA.length > 0
+    ? Math.max(...scoresA.map((s) => s.scores.length), 0)
+    : 0
+
+  return {
+    scoreA: sumScores(scoresA),
+    scoreB: sumScores(scoresB),
+    holesPlayed,
+  }
+}
+
+/**
  * Aggregate best ball stroke score for one side of a Two Team Best Ball Stroke round.
- * For each group, finds the two players from each team and sums their best ball total.
  */
 export function twoTeamBestBallAggregateScore(
   teamLetter: 'A' | 'B',

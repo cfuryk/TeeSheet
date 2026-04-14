@@ -7,11 +7,12 @@ interface Props {
   golferId: string | null
   isCreator?: boolean
   fallbackName?: string
+  handicap?: number | null
   score?: number | null
   holesPlayed?: number
 }
 
-export function PlayerSlot({ golferId, isCreator = false, fallbackName, score, holesPlayed }: Props) {
+export function PlayerSlot({ golferId, isCreator = false, fallbackName, handicap, score, holesPlayed }: Props) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
@@ -31,6 +32,8 @@ export function PlayerSlot({ golferId, isCreator = false, fallbackName, score, h
 
   const displayName = profile?.displayName ?? fallbackName
   const initial = displayName?.[0]?.toUpperCase() ?? '?'
+  // Use explicitly passed handicap when provided, otherwise fall back to profile
+  const displayHandicap = handicap !== undefined ? handicap : (profile?.teeSheetHandicap ?? null)
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-card-bg border border-card-border">
@@ -40,7 +43,7 @@ export function PlayerSlot({ golferId, isCreator = false, fallbackName, score, h
       <div className="flex-1 min-w-0">
         <p className="font-medium text-brand">{displayName ?? 'Loading...'}</p>
         <p className="text-xs text-muted">
-          {profile ? `HCP: ${profile.teeSheetHandicap != null ? formatHandicap(profile.teeSheetHandicap) : '—'}` : ''}
+          {`HCP: ${displayHandicap != null ? formatHandicap(displayHandicap) : '—'}`}
           {isCreator && <span className="ml-2 text-brand">Host</span>}
         </p>
       </div>

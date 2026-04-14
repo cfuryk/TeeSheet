@@ -11,6 +11,7 @@ import { userService } from '@/services/userService'
 import { groupService } from '@/services/groupService'
 import { roundService } from '@/services/roundService'
 import { golferScoreService } from '@/services/golferScoreService'
+import { eventService } from '@/services/eventService'
 import { PlayerSlot } from '@/components/round/PlayerSlot'
 import { TeamAssignment } from '@/components/round/TeamAssignment'
 import type { UserProfile, Group } from '@/types'
@@ -26,6 +27,7 @@ export function GroupPage() {
     const navigate = useNavigate()
 
     const [profiles, setProfiles] = useState<Record<string, UserProfile>>({})
+    const [eventHandicaps, setEventHandicaps] = useState<Record<string, number> | null>(null)
     const [, setStarting] = useState(false)
     const [savingTeams, setSavingTeams] = useState(false)
     const [error, setError] = useState('')
@@ -60,6 +62,13 @@ export function GroupPage() {
         })
     }, [group])
 
+    useEffect(() => {
+        if (!round?.eventId) return
+        eventService.getEvent(round.eventId).then((event) => {
+            setEventHandicaps(event?.handicaps ?? {})
+        })
+    }, [round?.eventId])
+
     // Auto-start scoring when round is active and this group is still pending
     useEffect(() => {
         if (!round || !group) return
@@ -86,9 +95,7 @@ export function GroupPage() {
     const isCreator = round.createdBy === uid
     const isInGroup = group.golferIds.includes(uid)
     const isBestBall = round.roundType === 'BEST_BALL_GROSS' || round.roundType === 'BEST_BALL_NET'
-    const isScramble = round.scoringFormat === 'scramble'
     const isStandalone = !round.eventId
-    const scrambleAdminId = group.groupAdminId ?? group.golferIds[0]
 
     const allHolesScored = !scoresLoading && scores.length > 0 && scores.every((s) => s.scores.length === 18)
     const canEdit = isCreator && group.status === 'pending'
@@ -237,31 +244,64 @@ export function GroupPage() {
             {/* Players */}
             <div>
                 <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Players</h2>
-                <div className="flex flex-col gap-2">
-                    {group.golferIds.map((gid) => {
+                {(() => {
+                    const g = group
+                    const r = round
+                    const teamA = g.teams?.teamA ?? []
+                    const teamB = g.teams?.teamB ?? []
+                    const hasTeams = teamA.length > 0 || teamB.length > 0
+
+                    function handicapFor(gid: string): number | null {
+                        if (eventHandicaps) return eventHandicaps[gid] ?? null
+                        return profiles[gid]?.teeSheetHandicap ?? null
+                    }
+
+                    function renderPlayer(gid: string, team?: 'A' | 'B') {
                         const sc = scores.find((s) => s.golferId === gid)
-                        const showScore = group.status !== 'pending' && sc
+                        const showScore = g.status !== 'pending' && sc
+                        const borderClass = team === 'A'
+                            ? 'border-l-4 border-brand'
+                            : team === 'B'
+                            ? 'border-l-4 border-danger'
+                            : ''
                         return (
-                            <div key={gid} className="flex items-center gap-2">
-                                <div className="flex-1">
-                                    <PlayerSlot
-                                        golferId={gid}
-                                        isCreator={round.createdBy === gid}
-                                        fallbackName={sc?.golferName}
-                                        score={showScore ? (sc.totalGross ?? undefined) : undefined}
-                                        holesPlayed={showScore ? sc.scores.length : undefined}
-                                    />
-                                </div>
-                                {isScramble && gid === scrambleAdminId && (
-                                    <Badge label="Admin" variant="yellow" />
-                                )}
+                            <div key={gid} className={`rounded-lg overflow-hidden ${borderClass}`}>
+                                <PlayerSlot
+                                    golferId={gid}
+                                    isCreator={r.createdBy === gid}
+                                    fallbackName={sc?.golferName}
+                                    handicap={handicapFor(gid)}
+                                    score={showScore ? (sc.totalGross ?? undefined) : undefined}
+                                    holesPlayed={showScore ? sc.scores.length : undefined}
+                                />
                             </div>
                         )
-                    })}
-                    {group.golferIds.length < 4 && group.status === 'pending' && (
-                        <PlayerSlot golferId={null} />
-                    )}
-                </div>
+                    }
+
+                    if (hasTeams) {
+                        return (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-xs font-semibold text-brand">Team A</span>
+                                    {teamA.map((gid) => renderPlayer(gid, 'A'))}
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-xs font-semibold text-danger">Team B</span>
+                                    {teamB.map((gid) => renderPlayer(gid, 'B'))}
+                                </div>
+                            </div>
+                        )
+                    }
+
+                    return (
+                        <div className="flex flex-col gap-2">
+                            {g.golferIds.map((gid) => renderPlayer(gid))}
+                            {g.golferIds.length < 4 && g.status === 'pending' && (
+                                <PlayerSlot golferId={null} />
+                            )}
+                        </div>
+                    )
+                })()}
             </div>
 
             {/* Team assignment (best-ball only, creator or in-group) */}

@@ -13,10 +13,11 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { Group, Score, GroupStatus } from '@/types'
+import type { Foursome } from '@/types/round'
 import { courseService } from './courseService'
 import { userService } from './userService'
 import { roundService } from './roundService'
-import { calculateCourseHandicap, buildStrokeAllocation } from '@/lib/handicap'
+import { calculateCourseHandicap, buildStrokeAllocation, applyHandicapPercent } from '@/lib/handicap'
 import { golferScoreService } from './golferScoreService'
 import { sideBetService } from './sideBetService'
 function groupsPath(roundId: string) {
@@ -285,13 +286,19 @@ export const groupService = {
       void adminProfile
       batch.set(scoreRef, score)
     } else {
+      // Apply match handicap percentage if round has a NET match configured
+      const handicapPercent = round.match?.scoring === 'NET'
+        ? (round.match.handicapPercent ?? 80)
+        : 100
+
       for (const golferId of group.golferIds) {
         const profile = await userService.getProfile(golferId)
         if (!profile) continue
         const handicapIndex = round.eventId
           ? (eventHandicaps[golferId] ?? 0)
           : (profile.teeSheetHandicap ?? 0)
-        const courseHandicap = calculateCourseHandicap(handicapIndex, tee.slope, tee.rating, tee.par)
+        const rawCourseHandicap = calculateCourseHandicap(handicapIndex, tee.slope, tee.rating, tee.par)
+        const courseHandicap = applyHandicapPercent(rawCourseHandicap, handicapPercent)
         const strokeAllocation = buildStrokeAllocation(courseHandicap, tee.holes)
         const scoreRef = doc(db, 'rounds', roundId, 'groups', groupId, 'scores', golferId)
         const score: Omit<Score, 'updatedAt'> & { updatedAt: ReturnType<typeof serverTimestamp> } = {
@@ -405,6 +412,62 @@ export const groupService = {
         )
         await sideBetService.settleSideBets(roundId, allFlatScores)
       }
+    }
+  },
+
+  /**
+   * Replace all existing groups for a round with the foursomes defined in the
+   * match team builder. Each Foursome becomes one Group with golferIds = teamA + teamB
+   * and teams = { teamA, teamB }. Existing pending groups are deleted first.
+   * Groups that are already active/completed/signed are left untouched.
+   */
+  async applyMatchFoursomes(roundId: string, foursomes: Foursome[]): Promise<void> {
+    if (foursomes.length === 0) return
+
+    // Fetch existing groups — only delete pending ones to avoid destroying in-progress play
+    const existingSnap = await getDocs(groupsPath(roundId))
+    const existing = existingSnap.docs.map((d) => ({ groupId: d.id, ...d.data() }) as Group)
+    const pendingGroups = existing.filter((g) => g.status === 'pending')
+
+    const batch = writeBatch(db)
+    for (const g of pendingGroups) {
+      batch.delete(groupDocPath(roundId, g.groupId))
+      batch.update(doc(db, 'rounds', roundId), {
+        groupIds: arrayRemove(g.groupId),
+        updatedAt: serverTimestamp(),
+      })
+    }
+    await batch.commit()
+
+    // Create one group per foursome
+    const allMemberIds: string[] = []
+    for (let i = 0; i < foursomes.length; i++) {
+      const fs = foursomes[i]
+      const golferIds = [...fs.teamA, ...fs.teamB]
+      allMemberIds.push(...golferIds)
+      const ref = await addDoc(groupsPath(roundId), {
+        roundId,
+        name: `Group ${i + 1}`,
+        golferIds,
+        teams: { teamA: fs.teamA, teamB: fs.teamB },
+        groupAdminId: golferIds[0] ?? null,
+        status: 'pending' as GroupStatus,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      await updateDoc(ref, { groupId: ref.id })
+      await updateDoc(doc(db, 'rounds', roundId), {
+        groupIds: arrayUnion(ref.id),
+        updatedAt: serverTimestamp(),
+      })
+    }
+
+    // Ensure all foursome members are in round.memberIds
+    if (allMemberIds.length > 0) {
+      await updateDoc(doc(db, 'rounds', roundId), {
+        memberIds: arrayUnion(...allMemberIds),
+        updatedAt: serverTimestamp(),
+      })
     }
   },
 }

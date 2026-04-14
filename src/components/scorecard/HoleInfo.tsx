@@ -16,7 +16,7 @@ interface Props {
   isLocked?: boolean
 }
 
-export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation, golferName, courseHandicap, vsPar, holesPlayed, totalGross, isLocked }: Props) {
+export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName, courseHandicap, vsPar, holesPlayed, totalGross, isLocked }: Props) {
   const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -164,17 +164,6 @@ export function HoleInfo({ hole, currentScore, onSelect, strokes = 0, navigation
           +
         </button>
       </div>
-
-      {strokes > 0 && (
-        <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-brand">
-          <span className="flex gap-0.5">
-            {Array.from({ length: strokes }).map((_, i) => (
-              <span key={i} className="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
-            ))}
-          </span>
-          <span>{strokes} stroke{strokes > 1 ? 's' : ''} on this hole</span>
-        </div>
-      )}
 
       <div className="border-t border-card-border mt-4 pt-3">
         {navigation}

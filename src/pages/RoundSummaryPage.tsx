@@ -16,6 +16,7 @@ import {
   twoTeamAggregateScore,
   twoTeamBestBallAggregateScore,
   buildLeaderboard,
+  aggregateStrokeMatchStatus,
 } from '@/lib/scoring'
 
 export function RoundSummaryPage() {
@@ -50,7 +51,7 @@ export function RoundSummaryPage() {
     return <div className="flex justify-center py-12"><Spinner /></div>
   }
 
-  const useNet = round.roundType.includes('NET')
+  const useNet = round.roundType.includes('NET') || round.match?.scoring === 'NET'
   const scoringFormat = round.scoringFormat ?? 'individual'
 
   return (
@@ -68,7 +69,9 @@ export function RoundSummaryPage() {
 
       <h1 className="text-2xl font-bold text-brand">Leaderboard</h1>
 
-      {scoringFormat === 'two_team'
+      {round.match
+        ? <MatchLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
+        : scoringFormat === 'two_team'
         ? <TwoTeamLeaderboard round={round} groups={groups} allScores={allScores} tee={tee} useNet={useNet} roundId={roundId!} navigate={navigate} />
         : scoringFormat === 'scramble'
         ? <ScrambleLeaderboard groups={groups} allScores={allScores} tee={tee} roundId={roundId!} navigate={navigate} />
@@ -80,7 +83,7 @@ export function RoundSummaryPage() {
 
 // ─── Individual leaderboard ────────────────────────────────────────────────
 
-function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId, navigate }: {
+function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId, navigate, matchTeamIds }: {
   round: import('@/types').Round
   groups: Group[]
   allScores: Score[]
@@ -88,6 +91,7 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
   useNet: boolean
   roundId: string
   navigate: ReturnType<typeof useNavigate>
+  matchTeamIds?: { A: string[]; B: string[] }
 }) {
   const isBestBall = round.roundType === 'BEST_BALL_GROSS' || round.roundType === 'BEST_BALL_NET'
 
@@ -146,7 +150,7 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
         <div className="flex gap-4 text-center shrink-0 ml-3">
           <p className="text-xs text-muted uppercase tracking-wide w-10">Round</p>
           <p className="text-xs text-muted uppercase tracking-wide w-10">Thru</p>
-          <p className="text-xs text-muted uppercase tracking-wide w-10">Total</p>
+          <p className="text-xs text-muted uppercase tracking-wide w-16 text-right">Total</p>
         </div>
       </div>
       <div className="flex flex-col gap-2">
@@ -154,18 +158,27 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
           const gross = sc.scores.reduce((s, h) => s + h.grossScore, 0)
           const net = sc.scores.reduce((s, h) => s + h.netScore, 0)
           const displayScore = holesPlayed > 0 ? (useNet ? net : gross) : null
+          const displayGross = holesPlayed > 0 ? gross : null
+          const isTeamA = matchTeamIds?.A.includes(sc.golferId)
+          const isTeamB = matchTeamIds?.B.includes(sc.golferId)
+          const rowClass = isTeamA
+            ? 'bg-brand/20 border border-brand/30'
+            : isTeamB
+            ? 'bg-danger/20 border border-danger/30'
+            : 'bg-card-bg'
+          const nameColor = isTeamA ? 'text-brand' : isTeamB ? 'text-danger' : 'text-brand'
           return (
             <button
               key={sc.golferId}
               type="button"
               onClick={() => navigate(`/rounds/${roundId}/scorecard/${sc.golferId}`)}
-              className="flex items-center justify-between px-3 py-2 rounded-lg bg-card-bg hover:bg-card-bg transition-colors w-full text-left"
+              className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors w-full text-left ${rowClass}`}
             >
               <span className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="text-xs w-7 shrink-0 font-bold text-muted text-center">{rankLabel}</span>
-                <span className="text-brand truncate text-sm font-semibold">{sc.golferName}</span>
+                <span className={`truncate text-sm font-semibold ${nameColor}`}>{sc.golferName}</span>
               </span>
-              <ScoreStatus holesPlayed={holesPlayed} isLocked={sc.isLocked} score={displayScore} vsPar={vsPar ?? 0} />
+              <ScoreStatus holesPlayed={holesPlayed} isLocked={sc.isLocked} score={displayScore} vsPar={vsPar ?? 0} grossScore={useNet ? displayGross : null} />
             </button>
           )
         })}
@@ -336,6 +349,59 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
   )
 }
 
+// ─── Match leaderboard ─────────────────────────────────────────────────────
+
+function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navigate }: {
+  round: import('@/types').Round
+  groups: Group[]
+  allScores: Score[]
+  tee: Tee
+  useNet: boolean
+  roundId: string
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const match = round.match!
+
+  // Use round-level team arrays as authoritative source; fall back to group foursomes
+  const teamAIds = (match.teamA && match.teamA.length > 0)
+    ? match.teamA
+    : groups.flatMap((g) => g.teams?.teamA ?? [])
+  const teamBIds = (match.teamB && match.teamB.length > 0)
+    ? match.teamB
+    : groups.flatMap((g) => g.teams?.teamB ?? [])
+
+  const { scoreA, scoreB } = aggregateStrokeMatchStatus(teamAIds, teamBIds, allScores, useNet)
+  const leadingTeam = scoreA < scoreB ? 'A' : scoreB < scoreA ? 'B' : null
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Team score tiles */}
+      <div className="flex gap-3">
+        <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
+          <p className="text-3xl font-black text-brand">{scoreA > 0 ? scoreA : '—'}</p>
+        </div>
+        <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
+          <p className="text-3xl font-black text-danger">{scoreB > 0 ? scoreB : '—'}</p>
+        </div>
+      </div>
+
+      {/* Individual leaderboard with team color coding */}
+      <IndividualLeaderboard
+        round={round}
+        groups={groups}
+        allScores={allScores}
+        tee={tee}
+        useNet={useNet}
+        roundId={roundId}
+        navigate={navigate}
+        matchTeamIds={{ A: teamAIds, B: teamBIds }}
+      />
+    </div>
+  )
+}
+
 function TeamScoreTile({ label, score, avg, points, winner }: {
   label: string
   score?: number
@@ -363,21 +429,27 @@ function TeamScoreTile({ label, score, avg, points, winner }: {
   )
 }
 
-function ScoreStatus({ holesPlayed, isLocked, score, vsPar }: {
+function ScoreStatus({ holesPlayed, isLocked, score, vsPar, grossScore }: {
   holesPlayed: number
   isLocked: boolean
   score: number | null
   vsPar: number
+  grossScore?: number | null
 }) {
   const thru = (holesPlayed === 18 && isLocked) ? 'F' : holesPlayed > 0 ? `${holesPlayed}` : '-'
   const vsParColor = vsPar < 0 ? 'text-danger' : vsPar > 0 ? 'text-[#3A6280]' : 'text-brand'
+  const scoreDisplay = score !== null && score !== undefined
+    ? (grossScore !== null && grossScore !== undefined && grossScore !== score
+      ? `${score} (${grossScore})`
+      : `${score}`)
+    : '-'
   return (
     <div className="flex gap-4 text-center shrink-0 ml-3">
       <p className={`text-sm font-bold w-10 ${holesPlayed > 0 ? vsParColor : 'text-muted'}`}>
         {holesPlayed > 0 ? formatVsPar(vsPar) : '-'}
       </p>
       <p className="text-sm font-bold text-brand w-10">{thru}</p>
-      <p className="text-sm font-bold text-brand w-10">{score ?? '-'}</p>
+      <p className="text-sm font-bold text-brand w-16 text-right">{scoreDisplay}</p>
     </div>
   )
 }

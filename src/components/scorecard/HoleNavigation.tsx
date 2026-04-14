@@ -5,9 +5,10 @@ interface Props {
   onNext: () => void
   allScored?: boolean
   onReview?: () => void
+  strokes?: number
 }
 
-export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allScored, onReview }: Props) {
+export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allScored, onReview, strokes = 0 }: Props) {
   const onLast = currentHole === totalHoles
   const showReview = allScored && onLast
 
@@ -20,6 +21,18 @@ export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allSco
       >
         ← Prev
       </button>
+      {strokes > 0 ? (
+        <div className="flex items-center gap-1.5 text-xs text-brand">
+          <span className="flex gap-0.5">
+            {Array.from({ length: strokes }).map((_, i) => (
+              <span key={i} className="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
+            ))}
+          </span>
+          <span>{strokes} stroke{strokes > 1 ? 's' : ''}</span>
+        </div>
+      ) : (
+        <span />
+      )}
       {showReview ? (
         <button
           onClick={onReview}

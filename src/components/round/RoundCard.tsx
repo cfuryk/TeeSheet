@@ -1,7 +1,30 @@
 import { Link } from 'react-router-dom'
-import type { Round } from '@/types'
+import type { Round, Match } from '@/types'
 import { Card, Badge } from '@/components/ui'
 import { formatDate, roundTypeLabel } from '@/lib/formatters'
+
+function matchLabel(match: Match): string {
+  const teamFormatLabel: Record<string, string> = {
+    INDIVIDUAL: 'Individual',
+    AGGREGATE: 'Aggregate',
+    H2H_1V1: '1v1',
+    H2H_2V2: '2v2',
+  }
+  const matchTypeLabel: Record<string, string> = {
+    STROKE: 'Stroke',
+    NASSAU: 'Nassau',
+    MATCH_PLAY: 'Match Play',
+    HAMMER: 'Hammer',
+    HIGH_LOW: 'High Low',
+    SKINS: 'Skins',
+    BEST_BALL: 'Best Ball',
+  }
+  const parts: string[] = []
+  if (match.teamFormat !== 'INDIVIDUAL') parts.push(teamFormatLabel[match.teamFormat] ?? match.teamFormat)
+  parts.push(matchTypeLabel[match.matchType] ?? match.matchType)
+  parts.push(match.scoring === 'NET' ? 'Net' : 'Gross')
+  return parts.join(' · ')
+}
 
 interface Props {
     round: Round
@@ -20,11 +43,19 @@ export function RoundCard({ round, currentUserId: _currentUserId, showStatus: _s
             <div className="flex items-start justify-between mb-2">
                 <div className="min-w-0 flex-1 mr-3">
                     <p className="font-semibold text-brand truncate">{round.name}</p>
-                    <p className="text-sm text-muted flex gap-1 min-w-0">
-                        <span className="truncate">{round.courseName}</span>
-                        <span className="shrink-0 text-muted">·</span>
-                        <span className="shrink-0">{round.teeName}</span>
-                    </p>
+                    <p className="text-sm text-muted truncate">{round.courseName}</p>
+                    {(round.teeName || round.teeYardage != null) && (
+                        <p className="text-sm text-muted">
+                            {round.teeName}{round.teeYardage != null ? ` · ${round.teeYardage.toLocaleString()} yds` : ''}
+                        </p>
+                    )}
+                    {(round.teeRating != null || round.teeSlope != null) && (
+                        <p className="text-sm text-muted">
+                            {round.teeRating != null ? `${round.teeRating}` : ''}
+                            {round.teeRating != null && round.teeSlope != null ? ' / ' : ''}
+                            {round.teeSlope != null ? `${round.teeSlope}` : ''}
+                        </p>
+                    )}
                     <p className="text-sm text-danger">{formatDate(round.date)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -37,7 +68,9 @@ export function RoundCard({ round, currentUserId: _currentUserId, showStatus: _s
             </div>
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                    {round.eventId && <Badge label={roundTypeLabel(round.roundType)} variant="green" />}
+                    {round.match
+                        ? <Badge label={matchLabel(round.match)} variant="green" />
+                        : round.eventId && <Badge label={roundTypeLabel(round.roundType)} variant="green" />}
                     {round.isPrivate && <Badge label="Private" variant="purple" />}
                     {round.wager && round.wager > 0 && (
                         <Badge label={`$${round.wager.toFixed(2)} wager`} variant="blue" />

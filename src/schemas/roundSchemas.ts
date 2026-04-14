@@ -24,3 +24,20 @@ export const roundFormSchema = z.object({
 })
 
 export type RoundFormValues = z.infer<typeof roundFormSchema>
+
+const foursomeSchema = z.object({
+  teamA: z.array(z.string()),
+  teamB: z.array(z.string()),
+})
+
+export const matchFormSchema = z.object({
+  teamFormat: z.enum(['INDIVIDUAL', 'AGGREGATE', 'H2H_1V1', 'H2H_2V2']),
+  scoring: z.enum(['GROSS', 'NET']),
+  handicapPercent: z.coerce.number().min(0).max(100).optional(),
+  matchType: z.enum(['STROKE', 'NASSAU', 'MATCH_PLAY', 'HAMMER', 'HIGH_LOW', 'SKINS', 'BEST_BALL']),
+  teamA: z.array(z.string()).optional(),
+  teamB: z.array(z.string()).optional(),
+  foursomes: z.array(foursomeSchema).optional(),
+})
+
+export type MatchFormValues = z.infer<typeof matchFormSchema>

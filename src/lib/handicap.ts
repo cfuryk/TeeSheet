@@ -71,6 +71,15 @@ export function calculateHandicapIndex(differentials: number[]): number | null {
   return Math.min(Math.round(index * 10) / 10, 54.0)
 }
 
+/**
+ * Applies a handicap allowance percentage to a course handicap.
+ * Standard allowances: 100% (full), 80% (four-ball/team), 75%, etc.
+ * Always rounds to the nearest whole number.
+ */
+export function applyHandicapPercent(courseHandicap: number, percent: number): number {
+  return Math.round(courseHandicap * (percent / 100))
+}
+
 export function buildStrokeAllocation(courseHandicap: number, holes: Hole[]): number[] {
   const sorted = [...holes].sort((a, b) => a.number - b.number)
 

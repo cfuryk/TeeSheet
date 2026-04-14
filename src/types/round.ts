@@ -21,6 +21,35 @@ export type RoundType =
 
 export type RoundStatus = 'pending' | 'active' | 'completed'
 
+export type MatchType = 'STROKE' | 'NASSAU' | 'MATCH_PLAY' | 'HAMMER' | 'HIGH_LOW' | 'SKINS' | 'BEST_BALL'
+
+/** How teams are structured in a match.
+ *  INDIVIDUAL   — no teams; everyone plays for themselves
+ *  AGGREGATE    — two teams, combined score counts (e.g. best-ball aggregate)
+ *  H2H_1V1      — head-to-head, one player vs one player
+ *  H2H_2V2      — head-to-head, two players vs two players
+ */
+export type TeamFormat = 'INDIVIDUAL' | 'AGGREGATE' | 'H2H_1V1' | 'H2H_2V2'
+
+export interface Foursome {
+  teamA: string[]   // uids on team A in this group (up to 2)
+  teamB: string[]   // uids on team B in this group (up to 2)
+}
+
+export interface Match {
+  teamFormat: TeamFormat
+  scoring: 'GROSS' | 'NET'
+  /** Handicap percentage applied when scoring is NET. Defaults to 80. */
+  handicapPercent?: number
+  matchType: MatchType
+  /** Team A player uids (all players across all groups) */
+  teamA?: string[]
+  /** Team B player uids (all players across all groups) */
+  teamB?: string[]
+  /** Foursome pairings — each entry maps to a Group */
+  foursomes?: Foursome[]
+}
+
 export interface Team {
   teamA: [string, string]
   teamB: [string, string]
@@ -42,6 +71,9 @@ export interface Round {
   courseName: string
   teeId: string
   teeName: string
+  teeYardage?: number
+  teeRating?: number
+  teeSlope?: number
   date: Timestamp
   scoringFormat: ScoringFormat
   roundType: RoundType
@@ -56,6 +88,8 @@ export interface Round {
   simpleGrossScore?: number
   /** Optional wager amount per person in dollars. 0 or undefined means no wager. */
   wager?: number
+  /** Optional match/game configuration layered on top of the round's scores. */
+  match?: Match
   /** @deprecated moved to Group */
   golferIds?: string[]
   /** @deprecated moved to Group */

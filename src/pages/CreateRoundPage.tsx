@@ -6,9 +6,10 @@ import { useCourses } from '@/hooks/useCourses'
 import { roundService } from '@/services/roundService'
 import { groupService } from '@/services/groupService'
 import { eventService } from '@/services/eventService'
-import { roundFormSchema, RoundFormValues } from '@/schemas/roundSchemas'
+import { roundFormSchema, RoundFormValues, MatchFormValues } from '@/schemas/roundSchemas'
 import { Input, Button, Alert, SelectField, Card, DateInput } from '@/components/ui'
 import { CourseSelector } from '@/components/course/CourseSelector'
+import { MatchForm } from '@/components/round/MatchForm'
 import { useState, useEffect } from 'react'
 
 export function CreateRoundPage() {
@@ -18,6 +19,7 @@ export function CreateRoundPage() {
   const [searchParams] = useSearchParams()
   const eventId = searchParams.get('eventId') ?? undefined
   const [error, setError] = useState('')
+  const [match, setMatch] = useState<MatchFormValues | null>(null)
 
   const { register, handleSubmit, watch, control, setValue, formState: { errors, isSubmitting } } = useForm<RoundFormValues>({
     resolver: zodResolver(roundFormSchema),
@@ -70,17 +72,26 @@ export function CreateRoundPage() {
         course?.name ?? '',
         tee?.name ?? '',
         eventId,
+        match ?? undefined,
+        tee?.yardage,
+        tee?.rating,
+        tee?.slope,
       )
       if (eventId) {
         await eventService.addRoundToEvent(eventId, roundId)
         await eventService.cascadeEventMembersToRound(eventId, roundId)
       }
-      // Create the creator's group first, then fill remaining members into groups of 4
-      await groupService.createGroup(roundId, currentUser.uid)
-      if (eventId) {
-        const event = await eventService.getEvent(eventId)
-        if (event && event.memberIds.length > 1) {
-          await groupService.fillGroupsFromMembers(roundId, event.memberIds, currentUser.uid)
+      // Create the creator's group first, then fill remaining members into groups of 4.
+      // If a match with foursomes is configured, those replace the auto-filled groups.
+      if (match?.foursomes && match.foursomes.length > 0) {
+        await groupService.applyMatchFoursomes(roundId, match.foursomes)
+      } else {
+        await groupService.createGroup(roundId, currentUser.uid)
+        if (eventId) {
+          const event = await eventService.getEvent(eventId)
+          if (event && event.memberIds.length > 1) {
+            await groupService.fillGroupsFromMembers(roundId, event.memberIds, currentUser.uid)
+          }
         }
       }
       navigate(`/rounds/${roundId}`)
@@ -155,6 +166,8 @@ export function CreateRoundPage() {
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>
+
+          <MatchForm value={match} onChange={setMatch} />
 
           <Button type="submit" loading={isSubmitting} className="w-full mt-2">
             Start Round

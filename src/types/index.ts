@@ -10,6 +10,10 @@ export type {
   Round,
   RoundFormData,
   ActiveRoundContext,
+  MatchType,
+  TeamFormat,
+  Match,
+  Foursome,
 } from './round'
 export type {
   GolfEvent,

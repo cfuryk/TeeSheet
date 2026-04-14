@@ -8,6 +8,8 @@ import { groupService } from '@/services/groupService'
 import { roundService } from '@/services/roundService'
 import { scoreService } from '@/services/scoreService'
 import { golferScoreService } from '@/services/golferScoreService'
+import { courseService } from '@/services/courseService'
+import { eventService } from '@/services/eventService'
 import { GroupCard } from '@/components/round/GroupCard'
 import { RoundCard } from '@/components/round/RoundCard'
 import { ManageGroupsModal } from '@/components/round/ManageGroupsModal'
@@ -16,6 +18,7 @@ import {
     matchPlayPoints,
     twoTeamAggregateScore,
 } from '@/lib/scoring'
+import { calculateCourseHandicap, applyHandicapPercent } from '@/lib/handicap'
 import type { UserProfile, Score } from '@/types'
 
 export function RoundDetailPage() {
@@ -35,6 +38,7 @@ export function RoundDetailPage() {
     const [forcingComplete, setForcingComplete] = useState(false)
     const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({})
     const [allScores, setAllScores] = useState<Score[]>([])
+    const [computedCourseHandicaps, setComputedCourseHandicaps] = useState<Record<string, number>>({})
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -49,11 +53,40 @@ export function RoundDetailPage() {
     }, [round])
 
     useEffect(() => {
-        if (!round || round.status !== 'completed' || groups.length === 0) return
+        if (!round || round.status === 'pending' || groups.length === 0) return
         Promise.all(
             groups.map((g) => scoreService.getAllScores(round.roundId, g.groupId))
         ).then((results) => setAllScores(results.flat()))
     }, [round, groups])
+
+    // For pending rounds (no Score docs yet), compute courseHandicap from profiles + tee data
+    useEffect(() => {
+        if (!round || round.match?.scoring !== 'NET' || round.memberIds.length === 0) return
+        async function compute() {
+            const [course, event] = await Promise.all([
+                courseService.getCourse(round!.courseId),
+                round!.eventId ? eventService.getEvent(round!.eventId) : Promise.resolve(null),
+            ])
+            const tee = course?.tees.find((t) => t.teeId === round!.teeId)
+            if (!tee) return
+            const eventHandicaps = event?.handicaps ?? {}
+            const handicapPercent = round!.match?.scoring === 'NET'
+                ? (round!.match.handicapPercent ?? 80)
+                : 100
+            const profiles = await Promise.all(round!.memberIds.map((uid) => userService.getProfile(uid)))
+            const map: Record<string, number> = {}
+            for (const p of profiles) {
+                if (!p) continue
+                const hcpIndex = round!.eventId
+                    ? (eventHandicaps[p.uid] ?? 0)
+                    : (p.teeSheetHandicap ?? 0)
+                const raw = calculateCourseHandicap(hcpIndex, tee.slope, tee.rating, tee.par)
+                map[p.uid] = applyHandicapPercent(raw, handicapPercent)
+            }
+            setComputedCourseHandicaps(map)
+        }
+        compute()
+    }, [round?.memberIds.join(','), round?.eventId, round?.courseId, round?.teeId, round?.match?.scoring])
 
     if (roundLoading || groupsLoading) {
         return (
@@ -279,15 +312,27 @@ export function RoundDetailPage() {
                     </p>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {groups.map((g) => (
-                            <GroupCard
-                                key={g.groupId}
-                                group={g}
-                                roundId={round.roundId}
-                                currentUserId={uid}
-                                memberProfiles={memberProfiles}
-                            />
-                        ))}
+                        {groups.map((g) => {
+                            const scoreDocHandicaps = Object.fromEntries(
+                                allScores
+                                    .filter((s) => g.golferIds.includes(s.golferId))
+                                    .map((s) => [s.golferId, s.courseHandicap])
+                            )
+                            const courseHandicaps = Object.keys(scoreDocHandicaps).length > 0
+                                ? scoreDocHandicaps
+                                : computedCourseHandicaps
+                            return (
+                                <GroupCard
+                                    key={g.groupId}
+                                    group={g}
+                                    roundId={round.roundId}
+                                    currentUserId={uid}
+                                    memberProfiles={memberProfiles}
+                                    courseHandicaps={courseHandicaps}
+                                    isNetMatch={round.match?.scoring === 'NET'}
+                                />
+                            )
+                        })}
                     </div>
                 )}
             </div>

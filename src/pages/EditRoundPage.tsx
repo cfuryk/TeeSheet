@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -6,11 +6,14 @@ import { Timestamp } from 'firebase/firestore'
 import { useRound } from '@/hooks/useRound'
 import { useCourses } from '@/hooks/useCourses'
 import { roundService } from '@/services/roundService'
-import { roundFormSchema, RoundFormValues } from '@/schemas/roundSchemas'
+import { userService } from '@/services/userService'
+import { eventService } from '@/services/eventService'
+import { groupService } from '@/services/groupService'
+import { roundFormSchema, RoundFormValues, MatchFormValues } from '@/schemas/roundSchemas'
 import { Input, Button, Alert, SelectField, Card, DateInput, Spinner } from '@/components/ui'
 import { CourseSelector } from '@/components/course/CourseSelector'
+import { MatchForm } from '@/components/round/MatchForm'
 import { localDateFromString } from '@/lib/formatters'
-import { useState } from 'react'
 
 export function EditRoundPage() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -18,11 +21,13 @@ export function EditRoundPage() {
   const { courses } = useCourses()
   const navigate = useNavigate()
   const [error, setError] = useState('')
+  const [match, setMatch] = useState<MatchFormValues | null>(null)
+  const [roundMembers, setRoundMembers] = useState<{ uid: string; displayName: string; handicap: number | null }[]>([])
 
   const { register, handleSubmit, watch, control, setValue, reset, formState: { errors, isSubmitting } } =
     useForm<RoundFormValues>({
       resolver: zodResolver(roundFormSchema),
-      defaultValues: { roundType: 'STROKE_GROSS', isPrivate: false, date: '' },
+      defaultValues: { roundType: 'STROKE_GROSS', scoringFormat: 'individual', isPrivate: false, date: '' },
     })
 
   useEffect(() => {
@@ -33,9 +38,47 @@ export function EditRoundPage() {
       teeId: round.teeId,
       date: round.date.toDate().toISOString().slice(0, 10),
       roundType: round.roundType,
+      scoringFormat: round.scoringFormat,
       isPrivate: round.isPrivate,
     })
+    setMatch(round.match
+      ? {
+          teamFormat: round.match.teamFormat,
+          scoring: round.match.scoring,
+          handicapPercent: round.match.handicapPercent,
+          matchType: round.match.matchType,
+          teamA: round.match.teamA ?? [],
+          teamB: round.match.teamB ?? [],
+          foursomes: round.match.foursomes ?? [],
+        }
+      : null
+    )
   }, [round, reset])
+
+  // Load member display names + handicaps for team builder.
+  // Uses event handicaps when the round belongs to an event, otherwise teeSheetHandicap.
+  useEffect(() => {
+    if (!round || round.memberIds.length === 0) return
+    async function load() {
+      const [profiles, event] = await Promise.all([
+        Promise.all(round!.memberIds.map((uid) => userService.getProfile(uid))),
+        round!.eventId ? eventService.getEvent(round!.eventId) : Promise.resolve(null),
+      ])
+      const eventHandicaps = event?.handicaps ?? {}
+      setRoundMembers(
+        profiles
+          .filter((p): p is NonNullable<typeof p> => p !== null)
+          .map((p) => ({
+            uid: p.uid,
+            displayName: p.displayName,
+            handicap: round!.eventId
+              ? (eventHandicaps[p.uid] ?? null)
+              : p.teeSheetHandicap,
+          })),
+      )
+    }
+    load()
+  }, [round?.memberIds.join(','), round?.eventId])
 
   const selectedCourseId = watch('courseId')
   const selectedCourse = courses.find((c) => c.courseId === selectedCourseId)
@@ -53,13 +96,21 @@ export function EditRoundPage() {
         courseName: course?.name ?? round.courseName,
         teeId: data.teeId,
         teeName: tee?.name ?? round.teeName,
+        ...(tee?.yardage != null ? { teeYardage: tee.yardage } : {}),
+        ...(tee?.rating != null ? { teeRating: tee.rating } : {}),
+        ...(tee?.slope != null ? { teeSlope: tee.slope } : {}),
         date: Timestamp.fromDate(localDateFromString(data.date)),
         roundType: round.roundType,
         isPrivate: data.isPrivate,
-        wager: round.wager,
+        ...(round.wager != null ? { wager: round.wager } : {}),
+        ...(match != null ? { match } : {}),
       })
+      if (match?.foursomes && match.foursomes.length > 0) {
+        await groupService.applyMatchFoursomes(round.roundId, match.foursomes)
+      }
       navigate(`/rounds/${round.roundId}`)
-    } catch {
+    } catch (e) {
+      console.error(e)
       setError('Failed to update round. Please try again.')
     }
   }
@@ -120,6 +171,7 @@ export function EditRoundPage() {
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>
+          <MatchForm value={match} onChange={setMatch} roundMembers={roundMembers} />
           <div className="flex gap-2 mt-2">
             <Button type="submit" loading={isSubmitting} className="flex-1">
               Save Changes

@@ -81,7 +81,7 @@ export function EventDetailPage() {
 
       <div>
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">
-          Rounds ({event.roundIds.length})
+          Rounds ({roundsLoading ? event.roundIds.length : rounds.length})
         </h2>
         {roundsLoading ? (
           <div className="flex flex-col gap-3">
