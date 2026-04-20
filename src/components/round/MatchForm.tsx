@@ -145,7 +145,10 @@ const MATCH_TYPES_BY_FORMAT: Record<TeamFormat, { value: string; label: string }
     { value: 'HAMMER', label: 'Hammer' },
     { value: 'SKINS', label: 'Skins' },
   ],
-  AGGREGATE: [{ value: 'STROKE', label: 'Stroke' }],
+  AGGREGATE: [
+    { value: 'STROKE', label: 'Stroke' },
+    { value: 'BEST_BALL', label: 'Best Ball' },
+  ],
   H2H_1V1: [
     { value: 'STROKE', label: 'Stroke' },
     { value: 'NASSAU', label: 'Nassau' },

@@ -17,6 +17,8 @@ import {
   twoTeamBestBallAggregateScore,
   buildLeaderboard,
   aggregateStrokeMatchStatus,
+  bbMatchPlayHoleStatus,
+  matchStatusLabel,
 } from '@/lib/scoring'
 
 export function RoundSummaryPage() {
@@ -108,7 +110,12 @@ function IndividualLeaderboard({ round, groups, allScores, tee, useNet, roundId,
         pairs.push({ names, leadId: teamIds[0], total, vsPar })
       }
     }
-    pairs.sort((a, b) => (a.total ?? 999) - (b.total ?? 999))
+    pairs.sort((a, b) => {
+      if (a.total === null && b.total === null) return 0
+      if (a.total === null) return 1
+      if (b.total === null) return -1
+      return a.total - b.total
+    })
 
     return (
       <Card className="p-4">
@@ -196,15 +203,28 @@ function ScrambleLeaderboard({ groups, allScores, tee, roundId, navigate }: {
   roundId: string
   navigate: ReturnType<typeof useNavigate>
 }) {
-  const totalPar = tee.holes.reduce((s, h) => s + h.par, 0)
-
   const rows = groups.map((group) => {
     const adminId = group.groupAdminId ?? group.golferIds[0]
     const score = allScores.find((s) => s.golferId === adminId)
-    const total = score?.totalGross ?? null
-    const vsPar = total !== null ? total - totalPar : null
-    return { group, adminId, total, vsPar }
-  }).sort((a, b) => (a.total ?? 999) - (b.total ?? 999))
+    const holesPlayed = score?.scores.length ?? 0
+    const total = holesPlayed > 0
+      ? score!.scores.reduce((s, h) => s + h.grossScore, 0)
+      : null
+    const parPlayed = holesPlayed > 0
+      ? score!.scores.reduce((s, h) => {
+          const hole = tee.holes.find((hd) => hd.number === h.hole)
+          return s + (hole?.par ?? 0)
+        }, 0)
+      : null
+    const vsPar = total !== null && parPlayed !== null ? total - parPlayed : null
+    return { group, adminId, score, holesPlayed, total, vsPar }
+  }).sort((a, b) => {
+    if (a.vsPar === null && b.vsPar === null) return b.holesPlayed - a.holesPlayed
+    if (a.vsPar === null) return 1
+    if (b.vsPar === null) return -1
+    if (a.vsPar !== b.vsPar) return a.vsPar - b.vsPar
+    return b.holesPlayed - a.holesPlayed
+  })
 
   return (
     <Card className="p-4">
@@ -320,7 +340,15 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
           <h3 className="font-semibold text-muted mb-3">{label}</h3>
           <div className="flex flex-col gap-2">
             {scores
-              .sort((a, b) => ((useNet ? a.totalNet : a.totalGross) ?? 999) - ((useNet ? b.totalNet : b.totalGross) ?? 999))
+              .sort((a, b) => {
+                const aScore = (useNet ? a.totalNet : a.totalGross) ?? null
+                const bScore = (useNet ? b.totalNet : b.totalGross) ?? null
+                if (aScore === null && bScore === null) return b.scores.length - a.scores.length
+                if (aScore === null) return 1
+                if (bScore === null) return -1
+                if (aScore !== bScore) return aScore - bScore
+                return b.scores.length - a.scores.length
+              })
               .map((sc, i) => {
                 return (
                   <button
@@ -351,6 +379,20 @@ function TwoTeamLeaderboard({ round, groups, allScores, tee, useNet, roundId, na
 
 // ─── Match leaderboard ─────────────────────────────────────────────────────
 
+function statusColor(label: string): string {
+  if (label === '-' || label === 'AS' || label === 'Tied (AS)') return 'text-muted'
+  if (label.startsWith('Won') || label.endsWith('Up') || label === 'Dormie') return 'text-green-600'
+  return 'text-danger'
+}
+
+function lastNames(teamIds: string[], allScores: Score[], golferNames?: Record<string, string>): string {
+  return teamIds.map((uid) => {
+    const name = golferNames?.[uid] ?? allScores.find((s) => s.golferId === uid)?.golferName ?? uid
+    const parts = name.trim().split(/\s+/)
+    return parts.length >= 2 ? parts[parts.length - 1] : name
+  }).join(' / ')
+}
+
 function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navigate }: {
   round: import('@/types').Round
   groups: Group[]
@@ -361,6 +403,7 @@ function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navi
   navigate: ReturnType<typeof useNavigate>
 }) {
   const match = round.match!
+  const isBBMatch = match.teamFormat === 'AGGREGATE' && match.matchType === 'BEST_BALL'
 
   // Use round-level team arrays as authoritative source; fall back to group foursomes
   const teamAIds = (match.teamA && match.teamA.length > 0)
@@ -370,6 +413,70 @@ function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navi
     ? match.teamB
     : groups.flatMap((g) => g.teams?.teamB ?? [])
 
+  if (isBBMatch) {
+    // Aggregate BB match play: per-group match rows
+    let totalA = 0, totalB = 0
+    const matchRows = groups.map((group) => {
+      const gTeamA = group.teams?.teamA ?? []
+      const gTeamB = group.teams?.teamB ?? []
+      const gScores = allScores.filter((s) => group.golferIds.includes(s.golferId))
+      const { aUp, holesPlayed } = bbMatchPlayHoleStatus(gTeamA, gTeamB, gScores, tee.holes, useNet)
+      const holesRemaining = tee.holes.length - holesPlayed
+      const matchOver = holesPlayed > 0 && (holesRemaining === 0 || Math.abs(aUp) > holesRemaining)
+      if (matchOver) {
+        if (aUp > 0) totalA += 1
+        else if (aUp < 0) totalB += 1
+        else { totalA += 0.5; totalB += 0.5 }
+      }
+      const aLabel = matchStatusLabel(aUp, holesPlayed, tee.holes.length)
+      const bLabel = matchStatusLabel(-aUp, holesPlayed, tee.holes.length)
+      return { group, gTeamA, gTeamB, gScores, aLabel, bLabel, holesPlayed }
+    })
+    const leadingTeam = totalA > totalB ? 'A' : totalB > totalA ? 'B' : null
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex gap-3">
+          <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
+            <p className="text-3xl font-black text-brand">{totalA > 0 ? totalA : '—'}</p>
+          </div>
+          <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
+            <p className="text-3xl font-black text-danger">{totalB > 0 ? totalB : '—'}</p>
+          </div>
+        </div>
+
+        <Card className="p-4 flex flex-col gap-3">
+          <h3 className="font-semibold text-muted">Matches</h3>
+          {matchRows.map(({ group, gTeamA, gTeamB, gScores, aLabel, bLabel, holesPlayed }) => {
+            const namesA = lastNames(gTeamA, allScores, group.golferNames)
+            const namesB = lastNames(gTeamB, allScores, group.golferNames)
+            return (
+              <div key={group.groupId} className="rounded-lg border border-card-border bg-card-bg px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-sm font-bold w-20 shrink-0 ${statusColor(aLabel)}`}>{aLabel}</span>
+                  <div className="flex-1 text-center min-w-0 px-1">
+                    <p className="text-sm font-semibold text-brand truncate">
+                      {namesA} <span className="text-muted font-normal text-xs">vs</span> {namesB}
+                    </p>
+                  </div>
+                  <span className={`text-sm font-bold w-20 shrink-0 text-right ${statusColor(bLabel)}`}>{bLabel}</span>
+                </div>
+                {holesPlayed > 0 && (
+                  <p className="text-xs text-muted text-center mt-1">
+                    {holesPlayed === tee.holes.length ? 'Final' : `Thru ${holesPlayed}`}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </Card>
+      </div>
+    )
+  }
+
+  // Standard aggregate stroke match
   const { scoreA, scoreB } = aggregateStrokeMatchStatus(teamAIds, teamBIds, allScores, useNet)
   const leadingTeam = scoreA < scoreB ? 'A' : scoreB < scoreA ? 'B' : null
 

@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { eventService } from '@/services/eventService'
 import { roundService } from '@/services/roundService'
 import { userService } from '@/services/userService'
+import { usePanelState } from '@/hooks/usePanelState'
 import type { Round, UserProfile } from '@/types'
 
 export function EventDetailPage() {
@@ -19,7 +20,7 @@ export function EventDetailPage() {
   const [error, setError] = useState('')
   const [rounds, setRounds] = useState<Round[]>([])
   const [roundsLoading, setRoundsLoading] = useState(false)
-  const [participantsOpen, setParticipantsOpen] = useState(false)
+  const [participantsOpen, toggleParticipants] = usePanelState('event-participants', false)
 
   useEffect(() => {
     if (!event || event.roundIds.length === 0) { setRounds([]); return }
@@ -110,25 +111,24 @@ export function EventDetailPage() {
 
       {/* Participants & handicaps */}
       {event.memberIds?.length > 0 && (
-        <div>
+        <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
           <button
             type="button"
-            onClick={() => setParticipantsOpen((o) => !o)}
-            className="w-full flex items-center justify-between mb-3"
+            onClick={toggleParticipants}
+            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-card-bg transition-colors"
           >
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
+            <span className="text-sm font-semibold text-brand">
               Participants ({event.memberIds.length})
-            </h2>
+            </span>
             <svg
               className={`w-4 h-4 text-muted transition-transform ${participantsOpen ? 'rotate-180' : ''}`}
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
-              strokeLinecap="round" strokeLinejoin="round"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
             >
-              <path d="M6 9l6 6 6-6" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
           {participantsOpen && (
-            <Card className="divide-y divide-card-border">
+            <div className="border-t border-card-border divide-y divide-card-border">
               {event.memberIds.map((id) => (
                 <ParticipantRow
                   key={id}
@@ -140,7 +140,7 @@ export function EventDetailPage() {
                   showRemove={isAdmin}
                 />
               ))}
-            </Card>
+            </div>
           )}
         </div>
       )}

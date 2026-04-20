@@ -14,9 +14,10 @@ interface Props {
   isNet: boolean
   showBestBall?: boolean
   bare?: boolean
+  fullNames?: boolean
 }
 
-export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare = false }: Props) {
+export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare = false, fullNames = false }: Props) {
   const sorted = [...holes].sort((a, b) => a.number - b.number)
   const front = sorted.slice(0, 9)
   const back = sorted.slice(9, 18)
@@ -41,7 +42,7 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
             <th className="p-2 text-center border border-card-border text-brand w-10">Par</th>
             {scores.map((sc) => (
               <th key={sc.golferId} className="p-2 text-center border border-card-border text-brand truncate">
-                {shortName(sc.golferName)}
+                {fullNames ? sc.golferName : shortName(sc.golferName)}
               </th>
             ))}
             {showBestBall && (

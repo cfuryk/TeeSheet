@@ -9,8 +9,11 @@ export interface Group {
   roundId: string
   name: string | null
   golferIds: string[]
+  golferNames: Record<string, string>
   teams: { teamA: string[]; teamB: string[] } | null
   groupAdminId?: string
+  /** uid of the player currently holding the scorecard editing lock (scramble only) */
+  scorecardLockedBy?: string | null
   status: GroupStatus
   createdAt: Timestamp
   updatedAt: Timestamp

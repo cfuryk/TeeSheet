@@ -180,6 +180,12 @@ export function GroupPage() {
     const statusVariant = { pending: 'gray', active: 'blue', completed: 'green', signed: 'green' } as const
     const statusLabel = { pending: 'Pending', active: 'Active', completed: 'Completed', signed: 'Signed' } as const
 
+    const isScramble = round.scoringFormat === 'scramble'
+    const lockedByUid = group.scorecardLockedBy ?? null
+    const lockedByName = lockedByUid
+      ? (profiles[lockedByUid]?.displayName ?? scores.find((s) => s.golferId === lockedByUid)?.golferName ?? 'a teammate')
+      : null
+
     return (
         <div className="flex flex-col gap-4">
             {/* Back button — event rounds only */}
@@ -240,6 +246,18 @@ export function GroupPage() {
             </div>
 
             {error && <Alert message={error} />}
+
+            {/* Scramble lock status — shown when another player is editing */}
+            {isScramble && lockedByName && (
+                <div className="bg-card-bg border border-card-border rounded-xl px-4 py-3 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                    <p className="text-sm text-muted">
+                        Score entry in progress by <span className="font-semibold text-brand">{lockedByName}</span>
+                    </p>
+                </div>
+            )}
 
             {/* Players */}
             <div>

@@ -33,6 +33,7 @@ export function CreateRoundPage() {
 
   const selectedCourseId = watch('courseId')
   const selectedCourse = courses.find((c) => c.courseId === selectedCourseId)
+  const isScramble = watch('scoringFormat') === 'scramble'
 
   const namePlaceholder = (() => {
     const options = [
@@ -167,7 +168,26 @@ export function CreateRoundPage() {
             Private round (only visible to invited players)
           </label>
 
-          <MatchForm value={match} onChange={setMatch} />
+          <label className="flex items-center gap-2 text-sm text-brand">
+            <input
+              type="checkbox"
+              className="rounded"
+              checked={isScramble}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setValue('scoringFormat', 'scramble')
+                  setValue('roundType', 'SCRAMBLE_GROSS')
+                  setMatch(null)
+                } else {
+                  setValue('scoringFormat', 'individual')
+                  setValue('roundType', 'STROKE_GROSS')
+                }
+              }}
+            />
+            Scramble — one score per group, gross only
+          </label>
+
+          {!isScramble && <MatchForm value={match} onChange={setMatch} />}
 
           <Button type="submit" loading={isSubmitting} className="w-full mt-2">
             Start Round

@@ -37,6 +37,7 @@ export function RoundDetailPage() {
     const [confirmForceComplete, setConfirmForceComplete] = useState(false)
     const [forcingComplete, setForcingComplete] = useState(false)
     const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({})
+    const [eventHandicaps, setEventHandicaps] = useState<Record<string, number>>({})
     const [allScores, setAllScores] = useState<Score[]>([])
     const [computedCourseHandicaps, setComputedCourseHandicaps] = useState<Record<string, number>>({})
     const navigate = useNavigate()
@@ -51,6 +52,13 @@ export function RoundDetailPage() {
             setMemberProfiles(map)
         })
     }, [round])
+
+    useEffect(() => {
+        if (!round?.eventId) return
+        eventService.getEvent(round.eventId).then((event) => {
+            if (event?.handicaps) setEventHandicaps(event.handicaps)
+        })
+    }, [round?.eventId])
 
     useEffect(() => {
         if (!round || round.status === 'pending' || groups.length === 0) return
@@ -346,7 +354,7 @@ export function RoundDetailPage() {
                     <Button variant="secondary" onClick={() => navigate(`/invite-golfers?targetType=round&targetId=${round.roundId}&roundName=${encodeURIComponent(round.name)}`)}>
                         Invite Golfers
                     </Button>
-                    {groups.length > 1 && (
+                    {groups.length > 1 && !round.match && (
                         <Button variant="secondary" onClick={() => setManagingGroups(true)}>
                             Manage Groups
                         </Button>
@@ -405,6 +413,9 @@ export function RoundDetailPage() {
                     roundId={round.roundId}
                     groups={groups}
                     onClose={() => setManagingGroups(false)}
+                    isScramble={round.scoringFormat === 'scramble'}
+                    memberProfiles={memberProfiles}
+                    eventHandicaps={Object.keys(eventHandicaps).length > 0 ? eventHandicaps : undefined}
                 />
             )}
 

@@ -234,8 +234,58 @@ export function aggregateStrokeMatchStatus(
 }
 
 /**
- * Aggregate best ball stroke score for one side of a Two Team Best Ball Stroke round.
+ * Per-foursome best-ball match play status (hole-by-hole, net or gross).
+ * Returns how many holes Team A is up (negative = B is up) and holes played.
+ * A hole is only counted when both teams have scored it.
  */
+export function bbMatchPlayHoleStatus(
+  teamAIds: string[],
+  teamBIds: string[],
+  scores: Score[],
+  holes: Hole[],
+  useNet: boolean,
+): { aUp: number; holesPlayed: number } {
+  const teamAScores = scores.filter((sc) => teamAIds.includes(sc.golferId))
+  const teamBScores = scores.filter((sc) => teamBIds.includes(sc.golferId))
+
+  let aUp = 0
+  let holesPlayed = 0
+
+  for (const hole of holes) {
+    const aBest = bestBallHoleScore(teamAScores, hole.number, useNet)
+    const bBest = bestBallHoleScore(teamBScores, hole.number, useNet)
+    if (aBest === null || bBest === null) continue
+    holesPlayed++
+    if (aBest < bBest) aUp++
+    else if (bBest < aBest) aUp--
+  }
+
+  return { aUp, holesPlayed }
+}
+
+/**
+ * Human-readable match status label from Team A's perspective.
+ * e.g. "3 Up", "2 Down", "AS", "Won 4&3", "Lost 2&1", "Tied (AS)"
+ */
+export function matchStatusLabel(aUp: number, holesPlayed: number, totalHoles: number): string {
+  if (holesPlayed === 0) return '-'
+  const holesRemaining = totalHoles - holesPlayed
+  const absUp = Math.abs(aUp)
+  if (aUp === 0) {
+    return holesRemaining === 0 ? 'Tied (AS)' : 'AS'
+  }
+  // Match is clinched when lead > holes remaining
+  if (absUp > holesRemaining) {
+    const suffix = holesRemaining > 0 ? `${absUp}&${holesRemaining}` : `${absUp}`
+    return aUp > 0 ? `Won ${suffix}` : `Lost ${suffix}`
+  }
+  // Dormie: lead equals holes remaining — leading side can't lose
+  if (absUp === holesRemaining) {
+    return aUp > 0 ? 'Dormie' : `${absUp} Down`
+  }
+  return aUp > 0 ? `${absUp} Up` : `${absUp} Down`
+}
+
 export function twoTeamBestBallAggregateScore(
   teamLetter: 'A' | 'B',
   teamAssignments: Record<string, 'A' | 'B'>,

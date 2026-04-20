@@ -171,7 +171,14 @@ export function EditRoundPage() {
             <input type="checkbox" {...register('isPrivate')} className="rounded" />
             Private round (only visible to invited players)
           </label>
-          <MatchForm value={match} onChange={setMatch} roundMembers={roundMembers} />
+          {round?.scoringFormat === 'scramble' ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand/10 border border-brand/30">
+              <span className="text-xs font-semibold text-brand uppercase tracking-wide">Scramble · Gross</span>
+              <span className="text-xs text-muted">(scoring format cannot be changed after creation)</span>
+            </div>
+          ) : (
+            <MatchForm value={match} onChange={setMatch} roundMembers={roundMembers} />
+          )}
           <div className="flex gap-2 mt-2">
             <Button type="submit" loading={isSubmitting} className="flex-1">
               Save Changes

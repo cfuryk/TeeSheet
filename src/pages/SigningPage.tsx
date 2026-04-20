@@ -27,15 +27,21 @@ export function SigningPage() {
 
   const uid = currentUser!.uid
   const { round, group, scores, tee } = ctx
-  const signedCount = scores.filter((s) => s.isLocked).length
-  const allSigned = signedCount === group.golferIds.length
+  const isScramble = round.scoringFormat === 'scramble'
   const isNet = round.roundType.includes('NET')
+
+  // Scramble: one shared score doc — signed when that doc is locked
+  const scrambleScore = isScramble ? scores[0] : undefined
+  const allSigned = isScramble
+    ? (scrambleScore?.isLocked ?? false)
+    : scores.filter((s) => s.isLocked).length === group.golferIds.length
 
   async function handleSign() {
     setSigning(true)
     setError('')
     try {
-      await scoreService.signScore(roundId!, groupId!, uid, uid)
+      const scoreUid = isScramble ? (scrambleScore?.golferId ?? uid) : uid
+      await scoreService.signScore(roundId!, groupId!, scoreUid, uid)
       await groupService.checkAndCompleteGroup(roundId!, groupId!)
       navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
     } catch (e) {
@@ -60,39 +66,41 @@ export function SigningPage() {
         <div className="p-4">
           <h1 className="text-xl font-bold text-brand">Sign Scorecard</h1>
           <p className="text-muted text-sm mt-0.5">{round.courseName} · {round.teeName}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex-1 bg-card-border rounded-full h-2">
-              <div
-                className="bg-brand h-2 rounded-full transition-all"
-                style={{ width: `${(signedCount / group.golferIds.length) * 100}%` }}
-              />
-            </div>
-            <span className="text-sm text-muted">{signedCount}/{group.golferIds.length}</span>
-          </div>
         </div>
         {!allSigned && (
-          <div className="border-t border-card-border divide-y divide-card-border">
-            {scores.map((sc) => (
-              <div key={sc.golferId} className="flex items-center justify-between px-4 py-3">
-                <span className="font-semibold text-brand text-sm">{sc.golferName}</span>
-                {sc.isLocked ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-danger text-xl" style={{ fontFamily: "'Dancing Script', cursive" }}>
-                      {sc.golferName}
-                    </span>
-                    <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                ) : sc.golferId === uid ? (
-                  <Button size="sm" loading={signing} onClick={handleSign}>
-                    Sign My Card
-                  </Button>
-                ) : (
-                  <span className="text-xs text-muted">Awaiting signature</span>
-                )}
+          <div className="border-t border-card-border">
+            {isScramble ? (
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="font-semibold text-brand text-sm">{scrambleScore?.golferName ?? group.name ?? 'Team'}</span>
+                <Button size="sm" loading={signing} onClick={handleSign}>
+                  Sign Scorecard
+                </Button>
               </div>
-            ))}
+            ) : (
+              <div className="divide-y divide-card-border">
+                {scores.map((sc) => (
+                  <div key={sc.golferId} className="flex items-center justify-between px-4 py-3">
+                    <span className="font-semibold text-brand text-sm">{sc.golferName}</span>
+                    {sc.isLocked ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-danger text-xl" style={{ fontFamily: "'Dancing Script', cursive" }}>
+                          {sc.golferName}
+                        </span>
+                        <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    ) : sc.golferId === uid ? (
+                      <Button size="sm" loading={signing} onClick={handleSign}>
+                        Sign My Card
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted">Awaiting signature</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -113,7 +121,7 @@ export function SigningPage() {
           {/* Aggregate scorecard */}
           <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
             <div className="p-4">
-              <ScorecardGrid scores={scores} holes={tee.holes} isNet={isNet} bare />
+              <ScorecardGrid scores={scores} holes={tee.holes} isNet={isNet} bare fullNames={isScramble} />
             </div>
           </div>
 

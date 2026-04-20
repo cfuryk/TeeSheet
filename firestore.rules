@@ -141,7 +141,8 @@ service cloud.firestore {
           allow update: if isAuthed()
             && (isAdmin()
               || get(/databases/$(database)/documents/rounds/$(roundId)).data.createdBy == request.auth.uid
-              || request.auth.uid == uid);
+              || request.auth.uid == uid
+              || request.auth.uid in get(/databases/$(database)/documents/rounds/$(roundId)/groups/$(groupId)).data.golferIds);
 
           allow delete: if isAuthed()
             && (isAdmin()

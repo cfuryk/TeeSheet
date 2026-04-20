@@ -10,6 +10,7 @@ import {
   writeBatch,
   arrayUnion,
   arrayRemove,
+  runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { Group, Score, GroupStatus } from '@/types'
@@ -32,10 +33,12 @@ export const groupService = {
   async createGroup(roundId: string, firstGolferId: string, name?: string): Promise<string> {
     const existingSnap = await getDocs(groupsPath(roundId))
     const autoName = name ?? `Group ${existingSnap.size + 1}`
+    const profile = await userService.getProfile(firstGolferId)
     const ref = await addDoc(groupsPath(roundId), {
       roundId,
       name: autoName,
       golferIds: [firstGolferId],
+      golferNames: { [firstGolferId]: profile?.displayName ?? firstGolferId },
       teams: null,
       groupAdminId: firstGolferId,
       status: 'pending' as GroupStatus,
@@ -53,9 +56,11 @@ export const groupService = {
   },
 
   async addGolferToGroup(roundId: string, groupId: string, golferId: string): Promise<void> {
+    const profile = await userService.getProfile(golferId)
     const batch = writeBatch(db)
     batch.update(groupDocPath(roundId, groupId), {
       golferIds: arrayUnion(golferId),
+      [`golferNames.${golferId}`]: profile?.displayName ?? golferId,
       updatedAt: serverTimestamp(),
     })
     batch.update(doc(db, 'rounds', roundId), {
@@ -110,9 +115,10 @@ export const groupService = {
     const existing = existingSnap.docs.map((d) => ({ groupId: d.id, ...d.data() }) as Group)
 
     // Build mutable buckets from existing groups
-    const groupBuckets: { groupId: string; members: string[] }[] = existing.map((g) => ({
+    const groupBuckets: { groupId: string; members: string[]; isNew: boolean }[] = existing.map((g) => ({
       groupId: g.groupId,
       members: [...g.golferIds],
+      isNew: false,
     }))
 
     // Determine who still needs a slot
@@ -128,14 +134,37 @@ export const groupService = {
       if (bucket) {
         bucket.members.push(uid)
       } else {
-        // Create a new group document
-        const name = `Group ${newGroupIndex++}`
+        // Start a new group bucket (written in the batch below, not immediately)
+        groupBuckets.push({ groupId: '', members: [uid], isNew: true })
+        newGroupIndex++
+      }
+    }
+
+    // Write all changes in a batch:
+    // - Update existing buckets whose membership changed
+    // - Create new group docs for new buckets
+    const batch = writeBatch(db)
+    let groupCounter = existing.length + 1
+
+    for (const bucket of groupBuckets) {
+      if (!bucket.isNew) {
+        // Existing group — update only if membership changed
+        const orig = existing.find((g) => g.groupId === bucket.groupId)
+        if (orig && orig.golferIds.length !== bucket.members.length) {
+          batch.update(groupDocPath(roundId, bucket.groupId), {
+            golferIds: bucket.members,
+            updatedAt: serverTimestamp(),
+          })
+        }
+      } else {
+        // New group — create via addDoc outside the batch, then update memberIds on round
+        const name = `Group ${groupCounter++}`
         const ref = await addDoc(groupsPath(roundId), {
           roundId,
           name,
-          golferIds: [uid],
+          golferIds: bucket.members,
           teams: null,
-          groupAdminId: uid,
+          groupAdminId: bucket.members[0] ?? null,
           status: 'pending' as GroupStatus,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -143,19 +172,6 @@ export const groupService = {
         await updateDoc(ref, { groupId: ref.id })
         await updateDoc(doc(db, 'rounds', roundId), {
           groupIds: arrayUnion(ref.id),
-          updatedAt: serverTimestamp(),
-        })
-        groupBuckets.push({ groupId: ref.id, members: [uid] })
-      }
-    }
-
-    // Persist updated golferIds for existing buckets that changed
-    const batch = writeBatch(db)
-    for (const bucket of groupBuckets) {
-      const orig = existing.find((g) => g.groupId === bucket.groupId)
-      if (orig && orig.golferIds.length !== bucket.members.length) {
-        batch.update(groupDocPath(roundId, bucket.groupId), {
-          golferIds: bucket.members,
           updatedAt: serverTimestamp(),
         })
       }
@@ -445,10 +461,14 @@ export const groupService = {
       const fs = foursomes[i]
       const golferIds = [...fs.teamA, ...fs.teamB]
       allMemberIds.push(...golferIds)
+      const profiles = await Promise.all(golferIds.map((id) => userService.getProfile(id)))
+      const golferNames: Record<string, string> = {}
+      golferIds.forEach((id, idx) => { golferNames[id] = profiles[idx]?.displayName ?? id })
       const ref = await addDoc(groupsPath(roundId), {
         roundId,
         name: `Group ${i + 1}`,
         golferIds,
+        golferNames,
         teams: { teamA: fs.teamA, teamB: fs.teamB },
         groupAdminId: golferIds[0] ?? null,
         status: 'pending' as GroupStatus,
@@ -468,6 +488,63 @@ export const groupService = {
         memberIds: arrayUnion(...allMemberIds),
         updatedAt: serverTimestamp(),
       })
+    }
+  },
+
+  /**
+   * Rebalance scramble groups by writing new golferIds arrays in a single batch.
+   * Each entry in `assignments` corresponds to one existing group.
+   */
+  async rebalanceGroups(
+    roundId: string,
+    assignments: { groupId: string; golferIds: string[] }[],
+  ): Promise<void> {
+    const batch = writeBatch(db)
+    for (const { groupId, golferIds } of assignments) {
+      batch.update(groupDocPath(roundId, groupId), {
+        golferIds,
+        updatedAt: serverTimestamp(),
+      })
+    }
+    await batch.commit()
+  },
+
+  /**
+   * Attempt to claim the scorecard editing lock for a scramble group.
+   * Returns true if the lock was acquired (or already held by this user), false if blocked.
+   */
+  async claimScorecardLock(roundId: string, groupId: string, uid: string): Promise<boolean> {
+    const ref = groupDocPath(roundId, groupId)
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref)
+        const current = snap.data()?.scorecardLockedBy ?? null
+        if (current !== null && current !== uid) {
+          throw new Error('locked')
+        }
+        tx.update(ref, { scorecardLockedBy: uid, updatedAt: serverTimestamp() })
+      })
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  /**
+   * Release the scorecard editing lock — only clears if the caller holds it.
+   */
+  async releaseScorecardLock(roundId: string, groupId: string, uid: string): Promise<void> {
+    const ref = groupDocPath(roundId, groupId)
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref)
+        const current = snap.data()?.scorecardLockedBy ?? null
+        if (current === uid) {
+          tx.update(ref, { scorecardLockedBy: null, updatedAt: serverTimestamp() })
+        }
+      })
+    } catch {
+      // Best-effort — ignore errors on release
     }
   },
 }

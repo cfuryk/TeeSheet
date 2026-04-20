@@ -14,9 +14,11 @@ import { HoleInfo } from '@/components/scorecard/HoleInfo'
 import { HoleNavigation } from '@/components/scorecard/HoleNavigation'
 import { GroupScoreSummary } from '@/components/scorecard/GroupScoreSummary'
 import { MatchScoreSummary } from '@/components/scorecard/MatchScoreSummary'
+import { ScrambleScoreSummary } from '@/components/scorecard/ScrambleScoreSummary'
 import { ScorecardGrid } from '@/components/scorecard/ScorecardGrid'
 import { RoundChat } from '@/components/scorecard/RoundChat'
 import { Button, Spinner } from '@/components/ui'
+import { usePanelState } from '@/hooks/usePanelState'
 import type { Score, Hole, Group } from '@/types'
 
 // Fetch all scores across all groups in a round
@@ -25,7 +27,6 @@ function useRoundScores(roundId: string | undefined) {
 
   useEffect(() => {
     if (!roundId) return
-    // Listen to all groups, then collect their scores subcollections
     const unsub = onSnapshot(collection(db, 'rounds', roundId, 'groups'), (groupSnap) => {
       const groups = groupSnap.docs.map((d) => ({ groupId: d.id, ...d.data() } as Group))
       if (groups.length === 0) { setAllScores([]); return }
@@ -50,12 +51,12 @@ function useRoundScores(roundId: string | undefined) {
 }
 
 function ScorecardGridCollapsible({ scores, holes, isNet }: { scores: Score[]; holes: Hole[]; isNet: boolean }) {
-  const [open, setOpen] = useState(false)
+  const [open, toggle] = usePanelState('scorecard-grid')
   return (
     <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         className="w-full px-4 py-3 flex items-center justify-between text-left"
       >
         <span className="text-sm font-semibold text-brand">Scorecard</span>
@@ -88,7 +89,11 @@ export function ScorecardPage() {
   const [cancelling, setCancelling] = useState(false)
   const startingRef = useRef(false)
 
-  // Auto-start group if scores don't exist yet (navigated directly to scorecard)
+  // Scramble lock state: 'claiming' while attempting, 'held' if we own it, 'blocked' if another player has it
+  const [lockStatus, setLockStatus] = useState<'claiming' | 'held' | 'blocked'>('claiming')
+  const lockHeldRef = useRef(false)
+
+  // Auto-start group if scores don't exist yet
   useEffect(() => {
     if (!ctx || startingRef.current) return
     if (ctx.group.status === 'pending' && ctx.scores.length === 0) {
@@ -97,11 +102,34 @@ export function ScorecardPage() {
     }
   }, [ctx, roundId, groupId])
 
+  // Scramble lock: claim on mount, release on unmount
+  useEffect(() => {
+    if (!ctx || ctx.round.scoringFormat !== 'scramble') return
+    if (!currentUser?.uid) return
+
+    const uid = currentUser.uid
+    groupService.claimScorecardLock(roundId!, groupId!, uid).then((claimed) => {
+      if (claimed) {
+        lockHeldRef.current = true
+        setLockStatus('held')
+      } else {
+        setLockStatus('blocked')
+      }
+    })
+
+    return () => {
+      if (lockHeldRef.current) {
+        lockHeldRef.current = false
+        groupService.releaseScorecardLock(roundId!, groupId!, uid)
+      }
+    }
+  }, [ctx?.round.scoringFormat, roundId, groupId, currentUser?.uid])
+
   // Jump to first unscored hole once scores load
   useEffect(() => {
     if (holeInitialised || loading || !ctx) return
     const score = ctx.round.scoringFormat === 'scramble'
-      ? ctx.scores.find((sc) => sc.golferId === (ctx.group?.groupAdminId ?? ctx.group?.golferIds[0]))
+      ? ctx.scores[0]
       : ctx.scores.find((sc) => sc.golferId === currentUser?.uid)
     if (score) {
       const scored = new Set(score.scores.map((s) => s.hole))
@@ -118,12 +146,13 @@ export function ScorecardPage() {
   const isStandalone = !round.eventId
   const isCreator = round.createdBy === currentUser?.uid
   const isSoloRound = (round.memberIds?.length ?? 0) <= 1
-  const scrambleAdminId = group?.groupAdminId ?? group?.golferIds[0]
-  const isScrambleAdmin = isScramble && currentUser?.uid === scrambleAdminId
   const chatDisplayName = userProfile?.displayName ?? currentUser?.displayName ?? 'Player'
 
+  // For scramble: the one shared score doc
+  const scrambleScore = isScramble ? scores[0] : undefined
+
   const myScore = isScramble
-    ? scores.find((sc) => sc.golferId === scrambleAdminId)
+    ? scrambleScore
     : scores.find((sc) => sc.golferId === currentUser?.uid)
 
   const holeData = tee.holes.find((h) => h.number === currentHole)!
@@ -185,22 +214,36 @@ export function ScorecardPage() {
     }
   }
 
-  // Non-admin scramble member: read-only view
-  if (isScramble && !isScrambleAdmin) {
-    const adminName = myScore?.golferName ?? group?.name ?? 'Admin'
+  // Scramble: show spinner while claiming lock
+  if (isScramble && lockStatus === 'claiming') {
+    return <div className="flex justify-center py-12"><Spinner /></div>
+  }
+
+  // Scramble: blocked — another player holds the lock
+  if (isScramble && lockStatus === 'blocked') {
+    const lockedByName = group.scorecardLockedBy
+      ? (allRoundScores.find((s) => s.golferId === group.scorecardLockedBy)?.golferName
+        ?? userProfile?.displayName
+        ?? 'a teammate')
+      : 'a teammate'
     return (
       <div className="flex flex-col gap-4">
-        <div className="bg-card-bg border border-card-border rounded-xl p-4 text-center">
-          <p className="text-muted text-sm mb-1">Scores are being entered by</p>
-          <p className="text-brand font-semibold">{adminName}</p>
-        </div>
-        <HoleInfo hole={holeData} currentScore={null} onSelect={() => {}} navigation={nav} />
-        {myScore && (
-          <div className="bg-card-bg border border-card-border rounded-xl p-4">
-            <p className="text-xs text-muted uppercase tracking-wide mb-3">Group Score</p>
-            <ScorecardGrid scores={[myScore]} holes={tee.holes} isNet={false} bare />
+        <div className="bg-card-bg border border-card-border rounded-xl p-6 flex flex-col items-center gap-3 text-center">
+          <svg className="w-10 h-10 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+          <div>
+            <p className="text-brand font-bold text-base">Score entry is in progress</p>
+            <p className="text-muted text-sm mt-1">Scores are being entered by <span className="font-semibold text-brand">{lockedByName}</span></p>
           </div>
-        )}
+          <button
+            type="button"
+            onClick={() => navigate(`/rounds/${roundId}/summary`)}
+            className="mt-2 w-full py-2 rounded-lg bg-brand hover:bg-brand-hover text-white font-semibold text-sm transition-colors"
+          >
+            View Leaderboard
+          </button>
+        </div>
         {!isSoloRound && (
           <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
         )}
@@ -235,7 +278,7 @@ export function ScorecardPage() {
           strokes={isNetRound && myScore && !isScramble ? myStrokes : 0}
           navigation={nav}
           golferName={myScore?.golferName}
-          courseHandicap={myScore?.courseHandicap}
+          courseHandicap={isScramble ? undefined : myScore?.courseHandicap}
           vsPar={myVsPar}
           holesPlayed={myScore?.scores.length ?? 0}
           totalGross={myTotalGross}
@@ -244,6 +287,15 @@ export function ScorecardPage() {
       )}
       {!isSoloRound && (
         <RoundChat roundId={roundId!} uid={currentUser!.uid} displayName={chatDisplayName} />
+      )}
+      {isScramble && (
+        <ScrambleScoreSummary
+          groups={allGroups}
+          allScores={allRoundScores}
+          holes={tee.holes}
+          roundId={roundId!}
+          groupId={groupId!}
+        />
       )}
       {!isScramble && round.match && (
         <MatchScoreSummary
