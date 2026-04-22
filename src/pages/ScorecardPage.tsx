@@ -295,7 +295,7 @@ export function ScorecardPage() {
             <div className="flex flex-col gap-4 pt-4">
                 {/* Live Scoring tab */}
                 {validTab === 'scoring' && (
-                    <div className="flex flex-col gap-4" style={{ height: 'calc(100vh - 8rem)', overflow: 'hidden' }}>
+                    <div className="flex flex-col gap-4 -mb-8" style={{ height: 'calc(100dvh - 8.25rem)', overflow: 'hidden' }}>
                         {isMyScoreLocked ? (
                             <div className="bg-green-600 rounded-xl px-4 py-8 flex flex-col items-center gap-4 text-center">
                                 <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

@@ -26,7 +26,9 @@
       "Bash(grep -v \"//.*text-white\")",
       "Bash(grep -v \"^.*//.*$\")",
       "Bash(cp:*)",
-      "Bash(grep -n \"userService.recalculateHandicap\" src/services/groupService.ts src/pages/*.tsx)"
+      "Bash(grep -n \"userService.recalculateHandicap\" src/services/groupService.ts src/pages/*.tsx)",
+      "Bash(npm list *)",
+      "Bash(node *)"
     ]
   }
 }
