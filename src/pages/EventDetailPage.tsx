@@ -2,14 +2,24 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useEvent } from '@/hooks/useEvent'
 import { RoundCard } from '@/components/round/RoundCard'
-import { Spinner, Alert, Card, Button, Input } from '@/components/ui'
+import { Spinner, Alert, Card, Button, Input, TabBar } from '@/components/ui'
 import { formatHandicap } from '@/lib/formatters'
 import { useAuth } from '@/hooks/useAuth'
 import { eventService } from '@/services/eventService'
 import { roundService } from '@/services/roundService'
 import { userService } from '@/services/userService'
-import { usePanelState } from '@/hooks/usePanelState'
 import type { Round, UserProfile } from '@/types'
+
+type TabKey = 'rounds' | 'participants' | 'info'
+
+function getInitialTab(): TabKey {
+  try {
+    const stored = localStorage.getItem('event-tab') as TabKey | null
+    return stored ?? 'rounds'
+  } catch {
+    return 'rounds'
+  }
+}
 
 export function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>()
@@ -20,7 +30,12 @@ export function EventDetailPage() {
   const [error, setError] = useState('')
   const [rounds, setRounds] = useState<Round[]>([])
   const [roundsLoading, setRoundsLoading] = useState(false)
-  const [participantsOpen, toggleParticipants] = usePanelState('event-participants', false)
+  const [activeTab, setActiveTab] = useState<TabKey>(getInitialTab)
+
+  function handleTabChange(tab: string) {
+    setActiveTab(tab as TabKey)
+    try { localStorage.setItem('event-tab', tab) } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (!event || event.roundIds.length === 0) { setRounds([]); return }
@@ -46,8 +61,8 @@ export function EventDetailPage() {
   const uid = currentUser!.uid
   const isMember = event.memberIds?.includes(uid)
   const isCreator = event.createdBy === uid
-
   const isAdmin = userProfile?.isAdmin ?? false
+
   if (event.isPrivate && !isMember && !isCreator) {
     return (
       <div className="flex flex-col items-center justify-center pt-16 gap-3">
@@ -69,90 +84,122 @@ export function EventDetailPage() {
     }
   }
 
+  const tabs = [
+    { key: 'rounds', label: 'Rounds' },
+    { key: 'participants', label: 'Participants' },
+    { key: 'info', label: 'Info' },
+  ]
+
+  const statusLabel: Record<string, string> = {
+    upcoming: 'Upcoming',
+    active: 'Active',
+    completed: 'Completed',
+  }
+
+  const formatDate = (ts: { seconds: number }) => {
+    return new Date(ts.seconds * 1000).toLocaleDateString('en-US', {
+      month: 'long', day: 'numeric', year: 'numeric',
+    })
+  }
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-0 -mt-4">
       {error && <Alert message={error} />}
 
-      {/* Join button for public events */}
-      {!isMember && !event.isPrivate && event.status !== 'completed' && (
-        <Button loading={joining} onClick={handleJoin}>
-          Join Event
-        </Button>
-      )}
+      <TabBar tabs={tabs} active={activeTab} onChange={handleTabChange} />
 
-      <div>
-        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">
-          Rounds ({roundsLoading ? event.roundIds.length : rounds.length})
-        </h2>
-        {roundsLoading ? (
+      <div className="flex flex-col gap-4 pt-4">
+
+        {/* Rounds tab */}
+        {activeTab === 'rounds' && (
           <div className="flex flex-col gap-3">
-            {event.roundIds.map((rid) => (
-              <div key={rid} className="h-16 bg-card-bg rounded-xl animate-pulse" />
-            ))}
-          </div>
-        ) : rounds.length === 0 ? (
-          <Card className="p-4 text-center text-muted text-sm">No rounds yet.</Card>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {rounds.map((round) => (
-              <RoundCard key={round.roundId} round={round} currentUserId={uid} />
-            ))}
+            {roundsLoading ? (
+              event.roundIds.map((rid) => (
+                <div key={rid} className="h-16 bg-card-bg rounded-xl animate-pulse" />
+              ))
+            ) : rounds.length === 0 ? (
+              <Card className="p-4 text-center text-muted text-sm">No rounds yet.</Card>
+            ) : (
+              rounds.map((round) => (
+                <RoundCard key={round.roundId} round={round} currentUserId={uid} />
+              ))
+            )}
+            {isCreator && (
+              <Link
+                to={`/rounds/new/full?eventId=${event.eventId}`}
+                className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white h-9 rounded-xl font-semibold transition-colors text-sm"
+              >
+                + Add Round
+              </Link>
+            )}
           </div>
         )}
-        {isCreator && (
-          <Link
-            to={`/rounds/new/full?eventId=${event.eventId}`}
-            className="mt-3 flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-semibold transition-colors text-base"
-          >
-            + Add Round
-          </Link>
+
+        {/* Participants tab */}
+        {activeTab === 'participants' && (
+          <div className="flex flex-col gap-3">
+            {!isMember && !event.isPrivate && event.status !== 'completed' && (
+              <Button loading={joining} onClick={handleJoin}>
+                Join Event
+              </Button>
+            )}
+            {event.memberIds?.length > 0 ? (
+              <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden divide-y divide-card-border">
+                {event.memberIds.map((id) => (
+                  <ParticipantRow
+                    key={id}
+                    uid={id}
+                    handicap={event.handicaps[id] ?? 0}
+                    eventId={event.eventId}
+                    canEdit={isCreator && event.status === 'upcoming'}
+                    canRemove={isAdmin && id !== uid}
+                    showRemove={isAdmin}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Card className="p-4 text-center text-muted text-sm">No participants yet.</Card>
+            )}
+            {isCreator && (
+              <button
+                onClick={() => navigate(`/invite-golfers?targetType=event&targetId=${event.eventId}`)}
+                className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white h-9 rounded-xl font-semibold transition-colors text-sm"
+              >
+                + Invite Participants
+              </button>
+            )}
+          </div>
         )}
+
+        {/* Info tab */}
+        {activeTab === 'info' && (
+          <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden divide-y divide-card-border">
+            <InfoRow label="Event Name" value={event.name} />
+            <InfoRow label="Status" value={statusLabel[event.status] ?? event.status} />
+            <InfoRow label="Type" value={event.type === 'multi_round' ? 'Multi-Round' : 'Single Round'} />
+            <InfoRow label="Visibility" value={event.isPrivate ? 'Private' : 'Public'} />
+            <InfoRow label="Start Date" value={formatDate(event.date)} />
+            {event.endDate && (
+              <InfoRow label="End Date" value={formatDate(event.endDate)} />
+            )}
+            {event.description && (
+              <InfoRow label="Description" value={event.description} />
+            )}
+            <InfoRow label="Participants" value={String(event.memberIds?.length ?? 0)} />
+            <InfoRow label="Rounds" value={String(event.roundIds?.length ?? 0)} />
+          </div>
+        )}
+
       </div>
+    </div>
+  )
+}
 
-      {/* Participants & handicaps */}
-      {event.memberIds?.length > 0 && (
-        <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
-          <button
-            type="button"
-            onClick={toggleParticipants}
-            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-card-bg transition-colors"
-          >
-            <span className="text-sm font-semibold text-brand">
-              Participants ({event.memberIds.length})
-            </span>
-            <svg
-              className={`w-4 h-4 text-muted transition-transform ${participantsOpen ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {participantsOpen && (
-            <div className="border-t border-card-border divide-y divide-card-border">
-              {event.memberIds.map((id) => (
-                <ParticipantRow
-                  key={id}
-                  uid={id}
-                  handicap={event.handicaps[id] ?? 0}
-                  eventId={event.eventId}
-                  canEdit={isCreator && event.status === 'upcoming'}
-                  canRemove={isAdmin && id !== uid}
-                  showRemove={isAdmin}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {isCreator && (
-        <button
-          onClick={() => navigate(`/invite-golfers?targetType=event&targetId=${event.eventId}`)}
-          className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-semibold transition-colors text-base"
-        >
-          + Invite Participants
-        </button>
-      )}
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between px-4 py-3 gap-4">
+      <span className="text-sm text-muted shrink-0">{label}</span>
+      <span className="text-sm text-brand font-medium text-right">{value}</span>
     </div>
   )
 }

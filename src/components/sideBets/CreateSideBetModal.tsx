@@ -3,14 +3,11 @@ import { sideBetService } from '@/services/sideBetService'
 import { Input, SelectField } from '@/components/ui'
 import type { Round, UserProfile, SideBetType } from '@/types'
 
-const BET_TYPES: { value: SideBetType; label: string; stub?: boolean }[] = [
-  { value: 'CHALLENGE_GROSS', label: 'Challenge Golfers (Gross)' },
-  { value: 'CHALLENGE_NET', label: 'Challenge Golfers (Net)' },
-  { value: 'CHALLENGE_TEAM_GROSS', label: 'Challenge Teams (Gross)' },
-  { value: 'CHALLENGE_TEAM_NET', label: 'Challenge Teams (Net)' },
-  { value: 'NASSAU_GROSS', label: 'Nassau - Front/Back/Total (Gross)', stub: true },
-  { value: 'NASSAU_NET', label: 'Nassau - Front/Back/Total (Net)', stub: true },
-  { value: 'SKINS', label: 'Skins', stub: true },
+const BET_TYPES: { value: SideBetType; label: string }[] = [
+  { value: 'CHALLENGE_GROSS', label: 'Challenge (Gross)' },
+  { value: 'CHALLENGE_NET', label: 'Challenge (Net)' },
+  { value: 'NASSAU_GROSS', label: 'Nassau - Front/Back/Total (Gross)' },
+  { value: 'NASSAU_NET', label: 'Nassau - Front/Back/Total (Net)' },
 ]
 
 interface Props {
@@ -106,8 +103,6 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const selectedType = BET_TYPES.find((t) => t.value === betType)!
-  const isStub = selectedType.stub === true
   const otherMembers = members.filter((m) => m.uid !== currentUserId)
 
   async function handleCreate() {
@@ -152,22 +147,13 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
           {/* Bet type */}
           <SelectField
             label="Bet Type"
-            options={BET_TYPES.map((t) => ({
-              value: t.value,
-              label: t.stub ? `${t.label} (Coming soon)` : t.label,
-              disabled: t.stub,
-            }))}
+            options={BET_TYPES.map((t) => ({ value: t.value, label: t.label }))}
             value={betType}
             onChange={(val) => setBetType(val as SideBetType)}
             colorScheme="blue"
           />
 
-          {isStub && (
-            <p className="text-sm text-muted text-center py-2">This bet type is coming soon.</p>
-          )}
-
-          {!isStub && (
-            <>
+          <>
               {/* Visibility toggle */}
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-muted">Visibility</span>
@@ -231,9 +217,15 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
                   onChange={(e) => setWager(e.target.value)}
                   placeholder="e.g. 5"
                 />
-                <p className="text-xs text-muted px-1">
-                  Each loser pays each winner ${wager || 'X'}. Winners collect from every other participant.
-                </p>
+                {betType === 'NASSAU_GROSS' || betType === 'NASSAU_NET' ? (
+                  <p className="text-xs text-muted px-1">
+                    ${wager || 'X'} per segment (Front 9, Back 9, Total). Max exposure: ${wager ? (parseFloat(wager) * 3).toFixed(2) : '3X'} per person.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted px-1">
+                    Each loser pays each winner ${wager || 'X'}. Winners collect from every other participant.
+                  </p>
+                )}
               </div>
 
               {error && <p className="text-sm text-red-400">{error}</p>}
@@ -242,12 +234,11 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
                 type="button"
                 onClick={handleCreate}
                 disabled={saving}
-                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold transition-colors"
+                className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold transition-colors"
               >
                 {saving ? 'Creating...' : 'Create Bet'}
               </button>
             </>
-          )}
         </div>
       </div>
     </div>

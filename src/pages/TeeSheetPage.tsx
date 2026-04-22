@@ -121,7 +121,7 @@ export function TeeSheetPage() {
             {/* Open Event */}
             <Link
                 to={`/events/${USBROPEN_EVENT_ID}`}
-                className="bg-brand hover:bg-brand-hover text-white text-center py-3 rounded-xl font-semibold transition-colors"
+                className="bg-brand hover:bg-brand-hover text-white text-center h-9 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center"
             >
                 Event Details
             </Link>
@@ -143,7 +143,7 @@ export function TeeSheetPage() {
                         </div>
                         <p className="text-white font-bold text-lg leading-tight">{activeRound.name}</p>
                         <p className="text-white/70 text-sm">{activeRound.courseName} · {activeRound.teeName}</p>
-                        <div className="mt-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-center py-2.5 rounded-lg font-semibold text-sm">
+                        <div className="mt-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-center h-9 rounded-lg font-semibold text-sm flex items-center justify-center">
                             {groupLoading ? 'Loading…' : 'Go To Round'}
                         </div>
                     </div>
@@ -166,7 +166,7 @@ export function TeeSheetPage() {
                 </div>
                 <Link
                     to="/rounds/new"
-                    className="bg-brand hover:bg-brand-hover text-white text-center py-3 rounded-xl font-semibold transition-colors"
+                    className="bg-brand hover:bg-brand-hover text-white text-center h-9 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center"
                 >
                     Create Round or Enter Score
                 </Link>
@@ -188,7 +188,7 @@ export function TeeSheetPage() {
                                     </div>
                                     <p className="text-white font-bold text-lg leading-tight">{r.name}</p>
                                     <p className="text-white/70 text-sm">{r.courseName} · {r.teeName}</p>
-                                    <div className="mt-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-center py-2.5 rounded-lg font-semibold text-sm">
+                                    <div className="mt-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-center h-9 rounded-lg font-semibold text-sm flex items-center justify-center">
                                         Go To Round
                                     </div>
                                 </div>

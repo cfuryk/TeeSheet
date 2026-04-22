@@ -6,7 +6,6 @@ import {
   formatVsPar,
   calculateTotalVsPar,
   calculateTotalNetVsPar,
-  matchPlayPoints,
   bbMatchPlayHoleStatus,
   matchStatusLabel,
 } from '@/lib/scoring'
@@ -89,14 +88,18 @@ export function MatchScoreSummary({ match, groups, allScores, holes, useNet, rou
     ? match.teamB
     : groups.flatMap((g) => g.teams?.teamB ?? [])
 
+  const hasTeams = teamAIds.length > 0 && teamBIds.length > 0
+
   // Aggregate score display
   let scoreA: number, scoreB: number, leadingTeam: 'A' | 'B' | null
-  if (isBBMatch) {
+  if (hasTeams && isBBMatch) {
     const pts = bbAggregatePoints(groups, allScores, holes, useNet)
     scoreA = pts.totalA; scoreB = pts.totalB
-  } else {
+  } else if (hasTeams) {
     const result = aggregateStrokeMatchStatus(teamAIds, teamBIds, allScores, useNet)
     scoreA = result.scoreA; scoreB = result.scoreB
+  } else {
+    scoreA = 0; scoreB = 0
   }
   leadingTeam = scoreA > scoreB ? 'A' : scoreB > scoreA ? 'B' : null
 
@@ -124,17 +127,19 @@ export function MatchScoreSummary({ match, groups, allScores, holes, useNet, rou
       {open && (
         <div className="border-t border-card-border px-4 pt-3 pb-4 flex flex-col gap-3">
 
-          {/* Team score tiles */}
-          <div className="flex gap-3">
-            <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
-              <p className="text-3xl font-black text-brand">{scoreA > 0 ? scoreA : '—'}</p>
+          {/* Team score tiles — only when teams are assigned */}
+          {hasTeams && (
+            <div className="flex gap-3">
+              <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
+                <p className="text-3xl font-black text-brand">{scoreA > 0 ? scoreA : '—'}</p>
+              </div>
+              <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
+                <p className="text-3xl font-black text-danger">{scoreB > 0 ? scoreB : '—'}</p>
+              </div>
             </div>
-            <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
-              <p className="text-3xl font-black text-danger">{scoreB > 0 ? scoreB : '—'}</p>
-            </div>
-          </div>
+          )}
 
           {isBBMatch ? (
             // BB match play: one row per foursome showing match status
@@ -190,7 +195,8 @@ export function MatchScoreSummary({ match, groups, allScores, holes, useNet, rou
                   const bTotal = b.scores.length > 0 ? (useNet ? b.scores.reduce((s, h) => s + h.netScore, 0) : b.scores.reduce((s, h) => s + h.grossScore, 0)) : 999
                   return aTotal - bTotal
                 }).map((sc) => {
-                  const isTeamA = teamAIds.includes(sc.golferId)
+                  const isTeamA = hasTeams && teamAIds.includes(sc.golferId)
+                  const isTeamB = hasTeams && teamBIds.includes(sc.golferId)
                   const holesPlayed = sc.scores.length
                   const total = holesPlayed > 0
                     ? (useNet ? sc.scores.reduce((s, h) => s + h.netScore, 0) : sc.scores.reduce((s, h) => s + h.grossScore, 0))
@@ -202,8 +208,10 @@ export function MatchScoreSummary({ match, groups, allScores, holes, useNet, rou
                   const vsParColor = holesPlayed > 0
                     ? (vsPar < 0 ? 'text-danger' : vsPar > 0 ? 'text-[#3A6280]' : 'text-brand')
                     : 'text-muted'
-                  const rowClass = isTeamA ? 'bg-brand/20 border border-brand/30' : 'bg-danger/20 border border-danger/30'
-                  const nameColor = isTeamA ? 'text-brand' : 'text-danger'
+                  const rowClass = isTeamA ? 'bg-brand/20 border border-brand/30'
+                    : isTeamB ? 'bg-danger/20 border border-danger/30'
+                    : 'bg-card-bg border border-card-border'
+                  const nameColor = isTeamA ? 'text-brand' : isTeamB ? 'text-danger' : 'text-brand'
                   return (
                     <button
                       key={sc.golferId}
@@ -229,7 +237,7 @@ export function MatchScoreSummary({ match, groups, allScores, holes, useNet, rou
           <button
             type="button"
             onClick={() => navigate(`/rounds/${roundId}/summary?from=scorecard&groupId=${groupId}`)}
-            className="w-full py-2 rounded-lg font-semibold text-sm transition-colors bg-brand hover:bg-brand-hover text-white"
+            className="w-full h-9 rounded-lg font-semibold text-sm transition-colors bg-brand hover:bg-brand-hover text-white"
           >
             Full Match Leaderboard
           </button>

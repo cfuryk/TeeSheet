@@ -17,7 +17,7 @@ export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allSco
       <button
         onClick={onPrev}
         disabled={currentHole === 1}
-        className="px-4 py-2 rounded-lg bg-btn-secondary hover:bg-card-bg border border-card-border font-semibold text-muted disabled:opacity-30"
+        className="h-9 px-4 rounded-lg bg-btn-secondary hover:bg-card-bg border border-card-border text-sm font-semibold text-muted disabled:opacity-30"
       >
         ← Prev
       </button>
@@ -36,7 +36,7 @@ export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allSco
       {showReview ? (
         <button
           onClick={onReview}
-          className="px-4 py-2 rounded-lg bg-danger hover:bg-danger/90 font-semibold text-white"
+          className="h-9 px-4 rounded-lg bg-danger hover:bg-danger/90 text-sm font-semibold text-white"
         >
           Review Round
         </button>
@@ -44,7 +44,7 @@ export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allSco
         <button
           onClick={onNext}
           disabled={onLast}
-          className="px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover border border-brand font-semibold text-white disabled:opacity-30"
+          className="h-9 px-4 rounded-lg bg-brand hover:bg-brand-hover border border-brand text-sm font-semibold text-white disabled:opacity-30"
         >
           Next →
         </button>

@@ -86,7 +86,7 @@ export function TopNav() {
             </Link>
             <Link
               to="/register"
-              className="text-sm bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors"
+              className="inline-flex items-center text-sm bg-white/20 hover:bg-white/30 text-white px-3 h-8 rounded-lg font-semibold transition-colors"
             >
               Register
             </Link>

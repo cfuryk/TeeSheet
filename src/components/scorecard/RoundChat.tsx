@@ -6,6 +6,7 @@ interface Props {
   roundId: string
   uid: string
   displayName: string
+  className?: string
 }
 
 function formatTime(msg: RoundMessage): string {
@@ -14,7 +15,7 @@ function formatTime(msg: RoundMessage): string {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-export function RoundChat({ roundId, uid, displayName }: Props) {
+export function RoundChat({ roundId, uid, displayName, className = '' }: Props) {
   const [messages, setMessages] = useState<RoundMessage[]>([])
   const [open, setOpen] = useState(true)
   const [input, setInput] = useState('')
@@ -78,7 +79,7 @@ export function RoundChat({ roundId, uid, displayName }: Props) {
   }
 
   return (
-    <div className="bg-brand border border-brand rounded-xl overflow-hidden">
+    <div className={`bg-brand border border-brand rounded-xl overflow-hidden flex flex-col ${className}`}>
       {/* Header toggle */}
       <button
         type="button"
@@ -100,17 +101,34 @@ export function RoundChat({ roundId, uid, displayName }: Props) {
       </button>
 
       {open && (
-        <>
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Message list */}
           <div
             ref={listRef}
-            className="px-3 py-3 flex flex-col gap-3 overflow-y-auto max-h-48 border-t border-white/20"
+            className="px-3 py-3 flex flex-col gap-3 overflow-y-auto flex-1 min-h-32 border-t border-white/20"
           >
             {messages.length === 0 ? (
               <p className="text-xs text-white/60 text-center py-2">No messages yet. Say something!</p>
             ) : (
               messages.map((msg) => {
                 const isOwn = msg.uid === uid
+                if (msg.isAlert) {
+                  const alertStyles = {
+                    positive: 'bg-green-500/20 text-green-200 border-green-500/30',
+                    negative: 'bg-red-500/20 text-red-200 border-red-500/30',
+                    leader: 'bg-amber-400/20 text-amber-200 border-amber-400/30',
+                    correction: 'bg-red-500/20 text-red-200 border-red-500/30',
+                  }
+                  const style = alertStyles[msg.alertType ?? 'leader']
+                  return (
+                    <div key={msg.messageId} className="flex flex-col items-center">
+                      <p className="text-xs text-white/50 mb-0.5">{msg.displayName} · {formatTime(msg)}</p>
+                      <div className={`px-3 py-2 text-sm text-center max-w-[90%] break-words rounded-xl border ${style}`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  )
+                }
                 return (
                   <div key={msg.messageId} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                     <p className="text-xs text-white/60 mb-0.5 px-1">
@@ -143,14 +161,14 @@ export function RoundChat({ roundId, uid, displayName }: Props) {
               type="button"
               onClick={handleSend}
               disabled={!input.trim() || sending}
-              className="bg-danger hover:bg-danger/90 disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm transition-colors"
+              className="bg-danger hover:bg-danger/90 disabled:opacity-40 text-white rounded-lg px-3 h-9 text-sm transition-colors flex items-center justify-center"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

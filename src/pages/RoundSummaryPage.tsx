@@ -64,7 +64,7 @@ export function RoundSummaryPage() {
           if (from === 'scorecard' && groupId) navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)
           else navigate(`/rounds/${roundId}`)
         }}
-        className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white font-semibold py-3 rounded-xl transition-colors"
+        className="flex items-center justify-center w-full bg-brand hover:bg-brand-hover text-white font-semibold h-9 rounded-xl transition-colors"
       >
         Back to Round
       </button>
@@ -412,6 +412,7 @@ function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navi
   const teamBIds = (match.teamB && match.teamB.length > 0)
     ? match.teamB
     : groups.flatMap((g) => g.teams?.teamB ?? [])
+  const hasTeams = teamAIds.length > 0 && teamBIds.length > 0
 
   if (isBBMatch) {
     // Aggregate BB match play: per-group match rows
@@ -430,26 +431,28 @@ function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navi
       }
       const aLabel = matchStatusLabel(aUp, holesPlayed, tee.holes.length)
       const bLabel = matchStatusLabel(-aUp, holesPlayed, tee.holes.length)
-      return { group, gTeamA, gTeamB, gScores, aLabel, bLabel, holesPlayed }
+      return { group, gTeamA, gTeamB, aLabel, bLabel, holesPlayed }
     })
     const leadingTeam = totalA > totalB ? 'A' : totalB > totalA ? 'B' : null
 
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex gap-3">
-          <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
-            <p className="text-3xl font-black text-brand">{totalA > 0 ? totalA : '—'}</p>
+        {hasTeams && (
+          <div className="flex gap-3">
+            <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
+              <p className="text-3xl font-black text-brand">{totalA > 0 ? totalA : '—'}</p>
+            </div>
+            <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
+              <p className="text-3xl font-black text-danger">{totalB > 0 ? totalB : '—'}</p>
+            </div>
           </div>
-          <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
-            <p className="text-3xl font-black text-danger">{totalB > 0 ? totalB : '—'}</p>
-          </div>
-        </div>
+        )}
 
         <Card className="p-4 flex flex-col gap-3">
           <h3 className="font-semibold text-muted">Matches</h3>
-          {matchRows.map(({ group, gTeamA, gTeamB, gScores, aLabel, bLabel, holesPlayed }) => {
+          {matchRows.map(({ group, gTeamA, gTeamB, aLabel, bLabel, holesPlayed }) => {
             const namesA = lastNames(gTeamA, allScores, group.golferNames)
             const namesB = lastNames(gTeamB, allScores, group.golferNames)
             return (
@@ -482,17 +485,19 @@ function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navi
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Team score tiles */}
-      <div className="flex gap-3">
-        <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
-          <p className="text-3xl font-black text-brand">{scoreA > 0 ? scoreA : '—'}</p>
+      {/* Team score tiles — only when teams are assigned */}
+      {hasTeams && (
+        <div className="flex gap-3">
+          <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'A' ? 'border-brand bg-brand/20' : 'border-brand/30 bg-brand/20'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand">Team A</p>
+            <p className="text-3xl font-black text-brand">{scoreA > 0 ? scoreA : '—'}</p>
+          </div>
+          <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
+            <p className="text-3xl font-black text-danger">{scoreB > 0 ? scoreB : '—'}</p>
+          </div>
         </div>
-        <div className={`flex-1 rounded-xl p-3 text-center border-2 ${leadingTeam === 'B' ? 'border-danger bg-danger/20' : 'border-danger/30 bg-danger/20'}`}>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-danger">Team B</p>
-          <p className="text-3xl font-black text-danger">{scoreB > 0 ? scoreB : '—'}</p>
-        </div>
-      </div>
+      )}
 
       {/* Individual leaderboard with team color coding */}
       <IndividualLeaderboard
@@ -503,7 +508,7 @@ function MatchLeaderboard({ round, groups, allScores, tee, useNet, roundId, navi
         useNet={useNet}
         roundId={roundId}
         navigate={navigate}
-        matchTeamIds={{ A: teamAIds, B: teamBIds }}
+        matchTeamIds={hasTeams ? { A: teamAIds, B: teamBIds } : undefined}
       />
     </div>
   )

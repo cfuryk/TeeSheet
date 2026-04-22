@@ -101,6 +101,7 @@ export function InviteGolfersPage() {
               name: null,
               golferIds: [inviteeId],
               teams: null,
+              golferNames: {},
               status: 'pending',
               _localCount: 1,
               createdAt: null as unknown as Timestamp,
@@ -139,7 +140,7 @@ export function InviteGolfersPage() {
         <button
           type="button"
           onClick={handleBack}
-          className="px-3 py-2 rounded-xl bg-btn-secondary hover:bg-btn-secondary-hover text-brand text-sm font-semibold transition-colors"
+          className="h-9 px-3 rounded-xl bg-btn-secondary hover:bg-btn-secondary-hover text-brand text-sm font-semibold transition-colors"
         >
           Back
         </button>
@@ -253,7 +254,7 @@ export function InviteGolfersPage() {
           <button
             type="button"
             onClick={handleBack}
-            className="flex-1 py-3 rounded-xl bg-btn-secondary hover:bg-btn-secondary-hover text-brand font-semibold text-sm transition-colors"
+            className="flex-1 h-9 rounded-xl bg-btn-secondary hover:bg-btn-secondary-hover text-brand font-semibold text-sm transition-colors"
           >
             Cancel
           </button>
@@ -261,7 +262,7 @@ export function InviteGolfersPage() {
             type="button"
             onClick={handleConfirm}
             disabled={staged.length === 0 || submitting}
-            className="flex-1 py-3 rounded-xl bg-brand hover:bg-brand-hover disabled:opacity-50 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+            className="flex-1 h-9 rounded-xl bg-brand hover:bg-brand-hover disabled:opacity-50 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
           >
             {submitting && <Spinner size="sm" />}
             {submitting

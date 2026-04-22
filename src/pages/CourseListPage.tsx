@@ -11,7 +11,7 @@ export function CourseListPage() {
         <h2 className="text-xl font-bold text-brand">Courses</h2>
         <Link
           to="/courses/new"
-          className="bg-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-hover"
+          className="inline-flex items-center bg-brand text-white px-4 h-9 rounded-lg text-sm font-semibold hover:bg-brand-hover"
         >
           + New Course
         </Link>

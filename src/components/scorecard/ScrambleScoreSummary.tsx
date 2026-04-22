@@ -113,7 +113,7 @@ export function ScrambleScoreSummary({ groups, allScores, holes, roundId, groupI
               <button
                 type="button"
                 onClick={() => navigate(`/rounds/${roundId}/summary?from=scorecard&groupId=${groupId}`)}
-                className="w-full py-2 rounded-lg bg-brand hover:bg-brand-hover text-white font-semibold text-sm transition-colors"
+                className="w-full h-9 rounded-lg bg-brand hover:bg-brand-hover text-white font-semibold text-sm transition-colors"
               >
                 Full Leaderboard
               </button>

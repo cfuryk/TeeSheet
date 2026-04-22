@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { userService } from '@/services/userService'
 import { useRound } from '@/hooks/useRound'
 import { useGroups } from '@/hooks/useGroup'
+import { useSideBets } from '@/hooks/useSideBets'
 import { groupService } from '@/services/groupService'
 import { roundService } from '@/services/roundService'
 import { scoreService } from '@/services/scoreService'
@@ -26,6 +27,7 @@ export function RoundDetailPage() {
     const { currentUser, userProfile } = useAuth()
     const { round, loading: roundLoading } = useRound(roundId!)
     const { groups, loading: groupsLoading } = useGroups(roundId!)
+    const { sideBets } = useSideBets(roundId!)
     const [joining, setJoining] = useState(false)
     const [joinPickerOpen, setJoinPickerOpen] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
@@ -203,7 +205,7 @@ export function RoundDetailPage() {
             {round.eventId && (
                 <Link
                     to={`/events/${round.eventId}`}
-                    className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-semibold transition-colors"
+                    className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-hover text-white h-9 rounded-xl font-semibold transition-colors"
                 >
                     Back to Event
                 </Link>
@@ -276,14 +278,60 @@ export function RoundDetailPage() {
                 </Button>
             )}
 
+            {/* Invited side bets — active round, non-scramble, current user invited */}
+            {round.status === 'active' && round.scoringFormat !== 'scramble' && (() => {
+                const invitedBets = sideBets.filter((b) => b.invitedIds.includes(uid) && b.status === 'pending')
+                if (invitedBets.length === 0) return null
+                return (
+                    <div className="bg-blue-600/10 border border-blue-600/40 rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 flex items-center justify-between">
+                            <span className="text-sm font-semibold text-blue-400">Bet Invites ({invitedBets.length})</span>
+                            <span className="text-xs text-blue-400 animate-pulse">Action needed</span>
+                        </div>
+                        <div className="border-t border-blue-600/30 flex flex-col divide-y divide-blue-600/20">
+                            {invitedBets.map((bet) => (
+                                <button
+                                    key={bet.sideBetId}
+                                    type="button"
+                                    onClick={() => navigate(`/rounds/${round.roundId}/side-bets/${bet.sideBetId}`)}
+                                    className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-blue-600/10 transition-colors"
+                                >
+                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                        <span className="text-sm font-semibold text-blue-300">
+                                            {bet.type === 'NASSAU_GROSS' ? 'Nassau (Gross)'
+                                            : bet.type === 'NASSAU_NET' ? 'Nassau (Net)'
+                                            : bet.type === 'CHALLENGE_GROSS' ? 'Challenge (Gross)'
+                                            : 'Challenge (Net)'}
+                                        </span>
+                                        <span className="text-xs text-blue-400">${bet.wagerPerPerson.toFixed(2)} / {bet.type.startsWith('NASSAU') ? 'segment' : 'person'}</span>
+                                    </div>
+                                    <span className="text-xs font-semibold text-blue-300 shrink-0">Tap to respond →</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )
+            })()}
+
             {/* Go to Scorecard — active round, user has a group */}
             {round.status === 'active' && userGroup && (userGroup.status === 'active' || userGroup.status === 'pending') && (
-                <Button
-                    onClick={() => navigate(`/rounds/${round.roundId}/groups/${userGroup.groupId}/scorecard`)}
-                    className="w-full"
-                >
-                    Go to Scorecard
-                </Button>
+                <div className="flex gap-3">
+                    <Button
+                        onClick={() => navigate(`/rounds/${round.roundId}/groups/${userGroup.groupId}/scorecard`)}
+                        className="flex-1"
+                    >
+                        Go to Scorecard
+                    </Button>
+                    {round.scoringFormat !== 'scramble' && (
+                        <button
+                            type="button"
+                            onClick={() => navigate(`/rounds/${round.roundId}/side-bets`)}
+                            className="flex-1 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
+                        >
+                            Side Bets
+                        </button>
+                    )}
+                </div>
             )}
 
             {/* Groups */}

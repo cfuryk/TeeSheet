@@ -56,7 +56,7 @@ export function SigningPage() {
       <button
         type="button"
         onClick={() => navigate(`/rounds/${roundId}/groups/${groupId}/scorecard`)}
-        className="w-full py-3 rounded-xl bg-brand hover:bg-brand-hover text-white font-semibold text-sm transition-colors"
+        className="w-full h-9 rounded-xl bg-brand hover:bg-brand-hover text-white font-semibold text-sm transition-colors"
       >
         Back to Round
       </button>

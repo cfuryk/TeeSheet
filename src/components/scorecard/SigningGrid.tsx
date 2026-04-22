@@ -182,13 +182,13 @@ function HoleRow({
           <div className="flex gap-2">
             <button
               onClick={handleCommit}
-              className="flex-1 bg-brand hover:bg-brand-hover text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+              className="flex-1 bg-brand hover:bg-brand-hover text-white font-semibold h-9 rounded-lg text-sm transition-colors"
             >
               OK
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="flex-1 bg-card-bg hover:bg-card-bg text-brand font-semibold py-2 rounded-lg text-sm transition-colors"
+              className="flex-1 bg-card-bg hover:bg-card-bg text-brand font-semibold h-9 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>

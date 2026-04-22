@@ -6,12 +6,17 @@ import { useSideBets } from '@/hooks/useSideBets'
 import { scoreService } from '@/services/scoreService'
 import { userService } from '@/services/userService'
 import { sideBetService } from '@/services/sideBetService'
+import { nassauSegmentStatus } from '@/lib/scoring'
 import { Spinner, Badge } from '@/components/ui'
 import { BET_TYPE_LABELS } from '@/pages/SideBetsPage'
 import type { Score, SideBet, SideBetType } from '@/types'
 
 function isNetType(type: SideBetType) {
-  return type === 'CHALLENGE_NET' || type === 'CHALLENGE_TEAM_NET'
+  return type === 'CHALLENGE_NET' || type === 'NASSAU_NET'
+}
+
+function isNassauType(type: SideBetType) {
+  return type === 'NASSAU_GROSS' || type === 'NASSAU_NET'
 }
 
 export function SideBetDetailPage() {
@@ -127,7 +132,7 @@ export function SideBetDetailPage() {
         <button
           type="button"
           onClick={handleBack}
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors self-start"
+          className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors self-start"
         >
           {backLabel}
         </button>
@@ -138,6 +143,7 @@ export function SideBetDetailPage() {
 
   const b: SideBet = bet
   const useNet = isNetType(b.type)
+  const isNassau = isNassauType(b.type)
   const roundIsActive = round?.status === 'active' || round?.status === 'completed'
 
   const isInvited = b.invitedIds.includes(uid)
@@ -193,6 +199,28 @@ export function SideBetDetailPage() {
       return <p className="text-sm text-muted italic">Bet is open — waiting for round to begin.</p>
     }
 
+    // Nassau settled
+    if (b.status === 'settled' && isNassau) {
+      const nr = b.nassauResult
+      function segmentSettled(winners: string[] | null | undefined, label: string) {
+        if (!winners) return <span className="text-muted">—</span>
+        if (winners.length === 0) return <span className="text-muted">Tied</span>
+        return (
+          <span className="text-green-400 font-semibold">
+            {label}: {winners.map(getName).join(' / ')} +${b.wagerPerPerson.toFixed(2)}
+          </span>
+        )
+      }
+      return (
+        <div className="flex flex-col gap-1.5">
+          <div>{segmentSettled(nr?.front9Winners, 'Front 9')}</div>
+          <div>{segmentSettled(nr?.back9Winners, 'Back 9')}</div>
+          <div>{segmentSettled(nr?.totalWinners, 'Total')}</div>
+        </div>
+      )
+    }
+
+    // Challenge settled
     if (b.status === 'settled') {
       const winners = b.winnersIds ?? []
       if (winners.length === 0) {
@@ -219,7 +247,55 @@ export function SideBetDetailPage() {
       )
     }
 
-    // Active — live standing
+    // Active Nassau — live segment standings
+    if (isNassau) {
+      const scoreMap = scores
+      const segments: { key: 'front' | 'back' | 'total'; label: string }[] = [
+        { key: 'front', label: 'Front 9' },
+        { key: 'back', label: 'Back 9' },
+        { key: 'total', label: 'Total' },
+      ]
+      return (
+        <div className="flex flex-col gap-3">
+          {segments.map(({ key, label }) => {
+            const { leaders, playerScores, complete } = nassauSegmentStatus(
+              b.participantIds, scoreMap, key, useNet
+            )
+            const anyScored = b.participantIds.some((uid) => playerScores[uid] !== null)
+            return (
+              <div key={key}>
+                <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">{label}</p>
+                {!anyScored ? (
+                  <p className="text-xs text-muted italic">No scores yet</p>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {b.participantIds.map((id) => {
+                      const segScore = playerScores[id]
+                      const isLeading = leaders.includes(id) && segScore !== null
+                      return (
+                        <div key={id} className="flex items-center justify-between">
+                          <span className={`text-sm font-medium ${isLeading ? 'text-green-400' : 'text-brand'}`}>
+                            {getName(id)}{isLeading && leaders.length === 1 && complete ? ' ✓' : ''}
+                          </span>
+                          <span className="text-xs text-muted">
+                            {segScore !== null ? segScore : '—'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                    {leaders.length > 1 && anyScored && (
+                      <p className="text-xs text-muted italic mt-0.5">Tied</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+
+    // Active challenge — live standing
     if (!leader || leader.total === null) {
       return <p className="text-sm text-muted italic">No scores yet</p>
     }
@@ -275,9 +351,15 @@ export function SideBetDetailPage() {
       {/* Bet info */}
       <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-1">
         <p className="text-base font-semibold text-brand">{BET_TYPE_LABELS[b.type]}</p>
-        <p className="text-sm text-muted">
-          ${b.wagerPerPerson.toFixed(2)} <span className="text-muted">/ person · everyone vs everyone</span>
-        </p>
+        {isNassau ? (
+          <p className="text-sm text-muted">
+            ${b.wagerPerPerson.toFixed(2)} <span className="text-muted">/ segment · Front 9, Back 9, Total · max ${(b.wagerPerPerson * 3).toFixed(2)} / person</span>
+          </p>
+        ) : (
+          <p className="text-sm text-muted">
+            ${b.wagerPerPerson.toFixed(2)} <span className="text-muted">/ person · everyone vs everyone</span>
+          </p>
+        )}
       </div>
 
       {/* Scores */}
@@ -342,7 +424,7 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleAccept}
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+              className="flex-1 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
             >
               Accept Invite
             </button>
@@ -351,7 +433,7 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleDecline}
-              className="flex-1 py-3 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors border border-card-border"
+              className="flex-1 h-9 rounded-xl bg-card-bg hover:bg-card-bg text-brand text-sm font-semibold transition-colors border border-card-border"
             >
               Decline
             </button>
@@ -360,7 +442,7 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleJoin}
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+              className="flex-1 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
             >
               Join Bet
             </button>
@@ -369,7 +451,7 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleCancel}
-              className="flex-1 py-3 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors border border-card-border"
+              className="flex-1 h-9 rounded-xl bg-card-bg hover:bg-card-bg text-brand text-sm font-semibold transition-colors border border-card-border"
             >
               Cancel Bet
             </button>

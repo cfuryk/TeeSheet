@@ -30,4 +30,4 @@ export type {
 } from './group'
 export type { GolferScore, ScoreSource } from './golferScore'
 export type { SideBet, SideBetType, SideBetStatus } from './sideBet'
-export type { RoundMessage } from './message'
+export type { RoundMessage, AlertType } from './message'

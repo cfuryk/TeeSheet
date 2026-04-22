@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type React from 'react'
 import type { Hole } from '@/types'
+import { formatHandicap } from '@/lib/formatters'
 
 interface Props {
   hole: Hole
@@ -66,62 +67,62 @@ export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName,
     <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
       {/* Player stat header */}
       {golferName && (
-        <div className="bg-brand px-4 py-3 mb-0">
-          <div className="flex items-start justify-between">
+        <div className="bg-brand px-4 py-2 mb-0">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-lg font-bold text-white leading-tight">{golferName}</p>
+              <p className="text-base font-bold text-white leading-tight">{golferName}</p>
               {courseHandicap !== undefined && (
-                <p className="text-xs text-white/60">Handicap: {courseHandicap}</p>
+                <p className="text-xs text-white/60">Handicap: {formatHandicap(courseHandicap)}</p>
               )}
             </div>
             <div className="flex gap-4 text-center">
               <div>
                 <p className="text-xs text-white/60 uppercase tracking-wide">Round</p>
-                <p className={`text-base font-bold ${vsPar !== null && vsPar !== undefined ? (vsPar < 0 ? 'text-red-400' : vsPar > 0 ? 'text-[#7BAFD4]' : 'text-white') : 'text-white/60'}`}>
+                <p className={`text-sm font-bold ${vsPar !== null && vsPar !== undefined ? (vsPar < 0 ? 'text-red-400' : vsPar > 0 ? 'text-[#7BAFD4]' : 'text-white') : 'text-white/60'}`}>
                   {vsPar !== null && vsPar !== undefined ? vsParLabel(vsPar) : '-'}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-white/60 uppercase tracking-wide">Thru</p>
-                <p className="text-base font-bold text-white">{thruLabel()}</p>
+                <p className="text-sm font-bold text-white">{thruLabel()}</p>
               </div>
               <div>
                 <p className="text-xs text-white/60 uppercase tracking-wide">Total</p>
-                <p className="text-base font-bold text-white">{totalGross ?? '-'}</p>
+                <p className="text-sm font-bold text-white">{totalGross ?? '-'}</p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="px-4 py-3">
+      <div className="px-4 py-2">
       {/* Hole stats row */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="text-center">
           <p className="text-xs text-muted uppercase tracking-wide">Hole</p>
-          <p className="text-2xl font-black text-brand">{hole.number}</p>
+          <p className="text-xl font-black text-brand">{hole.number}</p>
         </div>
         <div className="flex gap-5 text-center">
           <div>
             <p className="text-xs text-muted uppercase tracking-wide">Par</p>
-            <p className="text-2xl font-bold text-brand">{hole.par}</p>
+            <p className="text-xl font-bold text-brand">{hole.par}</p>
           </div>
           <div>
             <p className="text-xs text-muted uppercase tracking-wide">Yards</p>
-            <p className="text-2xl font-bold text-brand">{hole.yardage}</p>
+            <p className="text-xl font-bold text-brand">{hole.yardage}</p>
           </div>
           <div>
             <p className="text-xs text-muted uppercase tracking-wide">HCP</p>
-            <p className="text-2xl font-bold text-brand">{hole.handicap}</p>
+            <p className="text-xl font-bold text-brand">{hole.handicap}</p>
           </div>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="border-t border-card-border mb-3" />
+      <div className="border-t border-card-border mb-2" />
 
       {/* Score stepper */}
-      <div className="flex items-center justify-between h-12">
+      <div className="flex items-center justify-between h-10">
         <button
           type="button"
           onClick={() => adjust(-1)}
@@ -130,7 +131,7 @@ export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName,
           −
         </button>
 
-        <div className="flex items-center justify-center w-12 h-12">
+        <div className="flex items-center justify-center w-10 h-10">
           {editing ? (
             <input
               ref={inputRef}
@@ -141,13 +142,13 @@ export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName,
               onChange={(e) => setInputVal(e.target.value)}
               onBlur={commitInput}
               onKeyDown={(e) => { if (e.key === 'Enter') commitInput() }}
-              className="w-12 h-12 text-center text-3xl font-black bg-transparent text-brand border-b-2 border-brand outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-10 h-10 text-center text-2xl font-black bg-transparent text-brand border-b-2 border-brand outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           ) : (
             <button
               type="button"
               onClick={() => { setEditing(true); setInputVal(currentScore !== null ? String(currentScore) : '') }}
-              className={`w-12 h-12 inline-flex items-center justify-center text-3xl font-black transition-all ${
+              className={`w-10 h-10 inline-flex items-center justify-center text-2xl font-black transition-all ${
                 currentScore !== null ? scoreBadgeClass(currentScore) : 'text-muted'
               }`}
             >
@@ -165,7 +166,7 @@ export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName,
         </button>
       </div>
 
-      <div className="border-t border-card-border mt-4 pt-3">
+      <div className="border-t border-card-border mt-3 pt-2">
         {navigation}
       </div>
       </div>

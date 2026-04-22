@@ -7,7 +7,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import type { RoundMessage } from '@/types'
+import type { RoundMessage, AlertType } from '@/types'
 
 function messagesPath(roundId: string) {
   return collection(db, 'rounds', roundId, 'messages')
@@ -21,12 +21,15 @@ export const roundChatService = {
     })
   },
 
-  async sendMessage(roundId: string, uid: string, displayName: string, text: string): Promise<void> {
-    await addDoc(messagesPath(roundId), {
+  async sendMessage(roundId: string, uid: string, displayName: string, text: string, isAlert = false, alertType?: AlertType): Promise<void> {
+    const payload: Record<string, unknown> = {
       uid,
       displayName,
       text: text.trim(),
       createdAt: serverTimestamp(),
-    })
+    }
+    if (isAlert) payload.isAlert = true
+    if (alertType) payload.alertType = alertType
+    await addDoc(messagesPath(roundId), payload)
   },
 }

@@ -152,6 +152,30 @@ service cloud.firestore {
       }
 
       // =====================================================================
+      // rounds/{roundId}/sideBets/{sideBetId}
+      // =====================================================================
+      match /sideBets/{sideBetId} {
+        // Any round member or event member can read side bets
+        allow read: if isAuthed()
+          && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId));
+
+        // Any round member can create a side bet
+        allow create: if isAuthed()
+          && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId))
+          && request.resource.data.createdBy == request.auth.uid;
+
+        // Participants can update (accept/decline/join); creator or admin can cancel/settle
+        allow update: if isAuthed()
+          && (isAdmin()
+            || resource.data.createdBy == request.auth.uid
+            || request.auth.uid in resource.data.participantIds
+            || request.auth.uid in resource.data.invitedIds);
+
+        allow delete: if isAuthed()
+          && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      }
+
+      // =====================================================================
       // rounds/{roundId}/messages/{messageId}  — round chat
       // =====================================================================
       match /messages/{messageId} {

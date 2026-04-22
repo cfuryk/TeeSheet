@@ -33,33 +33,31 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
     }, 0)
   }
 
-  function renderGroup(group: Hole[], label: 'OUT' | 'IN') {
+  function renderGroup(group: Hole[], label: 'OUT' | 'IN', topBorder = false) {
     return (
-      <table className="w-full text-xs border-collapse table-fixed">
+      <table className={`w-full text-xs table-fixed border-collapse ${topBorder ? 'border-t border-card-border' : ''}`}>
         <thead>
-          <tr className="bg-card-border">
-            <th className="p-2 text-left border border-card-border text-brand w-10">Hole</th>
-            <th className="p-2 text-center border border-card-border text-brand w-10">Par</th>
+          <tr className="bg-card-bg divide-x divide-card-border border-b border-card-border">
+            <th className="p-2 text-left text-brand w-10">Hole</th>
+            <th className="p-2 text-center text-brand w-10">Par</th>
             {scores.map((sc) => (
-              <th key={sc.golferId} className="p-2 text-center border border-card-border text-brand truncate">
+              <th key={sc.golferId} className="p-2 text-center text-brand truncate">
                 {fullNames ? sc.golferName : shortName(sc.golferName)}
               </th>
             ))}
             {showBestBall && (
-              <th className="p-2 text-center border border-card-border text-brand font-semibold">
-                Best Ball
-              </th>
+              <th className="p-2 text-center text-brand font-semibold">Best Ball</th>
             )}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-card-border">
           {group.map((h) => {
             const bbScore = showBestBall ? bestBallHoleScore(scores, h.number, isNet) : null
             const bbVsPar = bbScore !== null ? scoreVsPar(bbScore, h.par) : null
             return (
-              <tr key={h.number} className="odd:bg-card-bg even:bg-white h-10">
-                <td className="p-2 text-center border border-card-border font-medium text-brand">{h.number}</td>
-                <td className="p-2 text-center border border-card-border text-muted">{h.par}</td>
+              <tr key={h.number} className="odd:bg-white even:bg-gray-50 h-10 divide-x divide-card-border">
+                <td className="p-2 text-center font-medium text-brand">{h.number}</td>
+                <td className="p-2 text-center text-muted">{h.par}</td>
                 {scores.map((sc) => {
                   const s = getScore(sc, h.number)
                   const grossScore = s?.grossScore ?? null
@@ -69,7 +67,7 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
                   const holeIdx = h.number - 1
                   const strokes = sc.strokeAllocation?.[holeIdx] ?? 0
                   return (
-                    <td key={sc.golferId} className="relative py-1 px-0 text-center border border-card-border">
+                    <td key={sc.golferId} className="relative py-1 px-0 text-center">
                       {isNet && strokes > 0 && (
                         <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-brand" />
                       )}
@@ -80,7 +78,7 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
                   )
                 })}
                 {showBestBall && (
-                  <td className="py-1 px-0 text-center border border-card-border bg-brand/5">
+                  <td className="py-1 px-0 text-center bg-brand/5">
                     <div className="flex items-center justify-center">
                       <ScoreBadge score={bbScore} vsPar={bbVsPar} />
                     </div>
@@ -90,18 +88,16 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
             )
           })}
           {/* Totals row */}
-          <tr className="bg-card-border font-bold">
-            <td className="p-2 text-center border border-card-border text-brand">{label}</td>
-            <td className="p-2 text-center border border-card-border text-muted">
-              {group.reduce((s, h) => s + h.par, 0)}
-            </td>
+          <tr className="bg-card-bg font-bold divide-x divide-card-border border-t border-card-border">
+            <td className="p-2 text-center text-brand">{label}</td>
+            <td className="p-2 text-center text-muted">{group.reduce((s, h) => s + h.par, 0)}</td>
             {scores.map((sc) => (
-              <td key={sc.golferId} className="p-2 text-center border border-card-border text-brand">
+              <td key={sc.golferId} className="p-2 text-center text-brand">
                 {halfTotal(sc, group, 'gross')}
               </td>
             ))}
             {showBestBall && (
-              <td className="p-2 text-center border border-card-border text-brand bg-brand/5">
+              <td className="p-2 text-center text-brand bg-brand/5">
                 {group.reduce((sum, h) => {
                   const bb = bestBallHoleScore(scores, h.number, isNet)
                   return sum + (bb ?? 0)
@@ -117,11 +113,11 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
   function renderTotals() {
     const totalPar = sorted.reduce((s, h) => s + h.par, 0)
     return (
-      <table className="w-full text-xs border-collapse table-fixed">
+      <table className="w-full text-xs table-fixed border-collapse border-t border-card-border">
         <tbody>
-          <tr className="bg-card-border font-bold">
-            <td className="p-2 text-center border border-card-border text-brand w-10">TOT</td>
-            <td className="p-2 text-center border border-card-border text-muted w-10">{totalPar}</td>
+          <tr className="bg-card-bg font-bold divide-x divide-card-border">
+            <td className="p-2 text-center text-brand w-10">TOT</td>
+            <td className="p-2 text-center text-muted w-10">{totalPar}</td>
             {scores.map((sc) => {
               const total = sc.scores.reduce((s, h) => s + h.grossScore, 0)
               const vsPar = sc.scores.length > 0
@@ -131,7 +127,7 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
                   }, 0)
                 : null
               return (
-                <td key={sc.golferId} className="p-2 text-center border border-card-border">
+                <td key={sc.golferId} className="p-2 text-center">
                   {sc.scores.length > 0 ? (
                     <span className={`font-bold ${vsPar !== null && vsPar < 0 ? 'text-danger' : vsPar !== null && vsPar > 0 ? 'text-[#3A6280]' : 'text-brand'}`}>
                       {total}
@@ -142,7 +138,7 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
                 </td>
               )
             })}
-            {showBestBall && <td className="p-2 text-center border border-card-border bg-brand/5" />}
+            {showBestBall && <td className="p-2 text-center bg-brand/5" />}
           </tr>
         </tbody>
       </table>
@@ -151,9 +147,9 @@ export function ScorecardGrid({ scores, holes, isNet, showBestBall = false, bare
 
   if (bare) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="rounded-xl overflow-hidden border border-card-border">
         {renderGroup(front, 'OUT')}
-        {back.length > 0 && renderGroup(back, 'IN')}
+        {back.length > 0 && renderGroup(back, 'IN', true)}
         {renderTotals()}
       </div>
     )

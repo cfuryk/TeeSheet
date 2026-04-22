@@ -304,3 +304,46 @@ export function twoTeamBestBallAggregateScore(
   }
   return total
 }
+
+// ─── Nassau helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Score for a Nassau segment. Returns null if the player hasn't completed all
+ * holes in that segment yet (front: 1-9, back: 10-18, total: 1-18).
+ */
+export function nassauSegmentScore(
+  holeScores: HoleScore[],
+  segment: 'front' | 'back' | 'total',
+  useNet: boolean,
+): number | null {
+  const [min, max, required] =
+    segment === 'front' ? [1, 9, 9] :
+    segment === 'back'  ? [10, 18, 9] :
+                          [1, 18, 18]
+  const relevant = holeScores.filter((h) => h.hole >= min && h.hole <= max)
+  if (relevant.length < required) return null
+  return relevant.reduce((s, h) => s + (useNet ? h.netScore : h.grossScore), 0)
+}
+
+/**
+ * Live segment status for a Nassau bet: who's leading, each player's score,
+ * and whether the segment is complete for all participants.
+ */
+export function nassauSegmentStatus(
+  participantIds: string[],
+  scoreMap: Record<string, Score>,
+  segment: 'front' | 'back' | 'total',
+  useNet: boolean,
+): { leaders: string[]; playerScores: Record<string, number | null>; complete: boolean } {
+  const playerScores: Record<string, number | null> = {}
+  for (const uid of participantIds) {
+    const sc = scoreMap[uid]
+    playerScores[uid] = sc ? nassauSegmentScore(sc.scores, segment, useNet) : null
+  }
+  const complete = participantIds.every((uid) => playerScores[uid] !== null)
+  const scored = participantIds.filter((uid) => playerScores[uid] !== null)
+  if (scored.length === 0) return { leaders: [], playerScores, complete }
+  const min = Math.min(...scored.map((uid) => playerScores[uid] as number))
+  const leaders = scored.filter((uid) => playerScores[uid] === min)
+  return { leaders, playerScores, complete }
+}

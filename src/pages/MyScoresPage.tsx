@@ -24,7 +24,7 @@ function ScorecardLink({ roundId, uid }: { roundId: string; uid: string }) {
   const link = useScorecardLink(roundId, uid)
   if (!link) return null
   return (
-    <Link to={link} className="text-xs font-semibold text-white bg-danger hover:bg-danger/90 px-3 py-1.5 rounded-lg transition-colors">
+    <Link to={link} className="inline-flex items-center text-xs font-semibold text-white bg-danger hover:bg-danger/90 px-3 h-8 rounded-lg transition-colors">
       View Scorecard
     </Link>
   )

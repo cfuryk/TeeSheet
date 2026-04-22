@@ -34,11 +34,8 @@ interface UnifiedBet {
 const BET_TYPE_LABELS: Record<SideBetType, string> = {
   CHALLENGE_GROSS: 'Challenge (Gross)',
   CHALLENGE_NET: 'Challenge (Net)',
-  CHALLENGE_TEAM_GROSS: 'Team Challenge (Gross)',
-  CHALLENGE_TEAM_NET: 'Team Challenge (Net)',
   NASSAU_GROSS: 'Nassau (Gross)',
   NASSAU_NET: 'Nassau (Net)',
-  SKINS: 'Skins',
 }
 
 const SIDE_BET_STATUS_VARIANT: Record<SideBetStatus, 'gray' | 'blue' | 'green' | 'yellow'> = {

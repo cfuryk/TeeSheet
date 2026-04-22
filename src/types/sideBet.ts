@@ -3,11 +3,8 @@ import { Timestamp } from 'firebase/firestore'
 export type SideBetType =
   | 'CHALLENGE_GROSS'
   | 'CHALLENGE_NET'
-  | 'CHALLENGE_TEAM_GROSS'
-  | 'CHALLENGE_TEAM_NET'
   | 'NASSAU_GROSS'
   | 'NASSAU_NET'
-  | 'SKINS'
 
 export type SideBetStatus = 'pending' | 'active' | 'settled' | 'cancelled'
 
@@ -28,6 +25,12 @@ export interface SideBet {
   declinedIds: string[]
   /** UIDs of lowest scorers once settled (multiple on tie) */
   winnersIds: string[] | null
+  /** Nassau only: per-segment winners. null = tied or segment not yet complete */
+  nassauResult?: {
+    front9Winners: string[] | null
+    back9Winners: string[] | null
+    totalWinners: string[] | null
+  }
   settledAt: Timestamp | null
   createdAt: Timestamp
   updatedAt: Timestamp

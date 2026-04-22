@@ -15,14 +15,15 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
+import { nassauSegmentScore } from '@/lib/scoring'
 import type { SideBet, SideBetStatus, SideBetType } from '@/types'
 import type { Score } from '@/types'
 
 const IMPLEMENTED_TYPES: SideBetType[] = [
   'CHALLENGE_GROSS',
   'CHALLENGE_NET',
-  'CHALLENGE_TEAM_GROSS',
-  'CHALLENGE_TEAM_NET',
+  'NASSAU_GROSS',
+  'NASSAU_NET',
 ]
 
 function sideBetsPath(roundId: string) {
@@ -160,9 +161,44 @@ export const sideBetService = {
     for (const bet of settleableBets) {
       if (bet.participantIds.length < 2) continue
 
-      const useNet = bet.type === 'CHALLENGE_NET' || bet.type === 'CHALLENGE_TEAM_NET'
+      const isNassau = bet.type === 'NASSAU_GROSS' || bet.type === 'NASSAU_NET'
+      const useNet = bet.type === 'CHALLENGE_NET' || bet.type === 'NASSAU_NET'
       const participantScores = allScores.filter((s) => bet.participantIds.includes(s.golferId))
 
+      if (isNassau) {
+        // All 18 holes must be complete for all participants
+        const allComplete = bet.participantIds.every((uid) => {
+          const sc = participantScores.find((s) => s.golferId === uid)
+          return sc && nassauSegmentScore(sc.scores, 'total', useNet) !== null
+        })
+        if (!allComplete) continue
+
+        function nassauWinners(segment: 'front' | 'back' | 'total'): string[] {
+          const segScores: Record<string, number> = {}
+          for (const sc of participantScores) {
+            const val = nassauSegmentScore(sc.scores, segment, useNet)
+            if (val !== null) segScores[sc.golferId] = val
+          }
+          const min = Math.min(...Object.values(segScores))
+          const winners = bet.participantIds.filter((uid) => segScores[uid] === min)
+          return winners.length === bet.participantIds.length ? [] : winners // empty = all tied
+        }
+
+        batch.update(sideBetDocPath(roundId, bet.sideBetId), {
+          status: 'settled' as SideBetStatus,
+          winnersIds: null,
+          nassauResult: {
+            front9Winners: nassauWinners('front'),
+            back9Winners: nassauWinners('back'),
+            totalWinners: nassauWinners('total'),
+          },
+          settledAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+        continue
+      }
+
+      // Challenge bets
       const totals: Record<string, number> = {}
       for (const sc of participantScores) {
         const val = useNet ? sc.totalNet : sc.totalGross

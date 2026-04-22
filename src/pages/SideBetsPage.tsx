@@ -10,13 +10,10 @@ import { Spinner, Badge } from '@/components/ui'
 import type { UserProfile, SideBet, SideBetType } from '@/types'
 
 export const BET_TYPE_LABELS: Record<SideBetType, string> = {
-  CHALLENGE_GROSS: 'Challenge Golfers (Gross)',
-  CHALLENGE_NET: 'Challenge Golfers (Net)',
-  CHALLENGE_TEAM_GROSS: 'Challenge Teams (Gross)',
-  CHALLENGE_TEAM_NET: 'Challenge Teams (Net)',
+  CHALLENGE_GROSS: 'Challenge (Gross)',
+  CHALLENGE_NET: 'Challenge (Net)',
   NASSAU_GROSS: 'Nassau (Gross)',
   NASSAU_NET: 'Nassau (Net)',
-  SKINS: 'Skins',
 }
 
 export function SideBetsPage() {
@@ -274,7 +271,7 @@ function BetCard({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onJoin(bet) }}
-          className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+          className="w-full h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
         >
           Join Bet
         </button>

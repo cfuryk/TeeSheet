@@ -188,12 +188,10 @@ export function GroupPage() {
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Back button — event rounds only */}
-            {!isStandalone && (
-                <Button onClick={() => navigate(`/rounds/${roundId}`)}>
-                    Back to Round
-                </Button>
-            )}
+            {/* Back button */}
+            <Button onClick={() => navigate(`/rounds/${roundId}`)}>
+                Back to Round
+            </Button>
 
             {/* Header */}
             <div className="bg-card-bg border border-card-border rounded-xl p-4">
@@ -454,7 +452,7 @@ export function GroupPage() {
                             <button
                                 type="button"
                                 onClick={() => { setShowConflict(false); navigate(`/rounds/${activeRound.roundId}`) }}
-                                className="w-full py-3 rounded-xl bg-brand hover:bg-brand-hover text-white font-semibold transition-colors"
+                                className="w-full h-9 rounded-xl bg-brand hover:bg-brand-hover text-white font-semibold transition-colors"
                             >
                                 Go Back &amp; Finish Active Round
                             </button>
@@ -462,14 +460,14 @@ export function GroupPage() {
                                 type="button"
                                 disabled={abandoning}
                                 onClick={handleAbandonAndStart}
-                                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold transition-colors"
+                                className="w-full h-9 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold transition-colors"
                             >
                                 {abandoning ? 'Starting...' : 'Abandon My Score & Start This Round'}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setShowConflict(false)}
-                                className="w-full py-3 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors"
+                                className="w-full h-9 rounded-xl bg-card-bg hover:bg-card-bg text-brand font-semibold transition-colors"
                             >
                                 Cancel
                             </button>
