@@ -4,10 +4,12 @@ import { Input, SelectField } from '@/components/ui'
 import type { Round, UserProfile, SideBetType } from '@/types'
 
 const BET_TYPES: { value: SideBetType; label: string }[] = [
-  { value: 'CHALLENGE_GROSS', label: 'Challenge (Gross)' },
-  { value: 'CHALLENGE_NET', label: 'Challenge (Net)' },
-  { value: 'NASSAU_GROSS', label: 'Nassau - Front/Back/Total (Gross)' },
-  { value: 'NASSAU_NET', label: 'Nassau - Front/Back/Total (Net)' },
+  { value: 'STROKE_GROSS', label: 'Stroke (Gross)' },
+  { value: 'STROKE_NET', label: 'Stroke (Net)' },
+  { value: 'NASSAU_GROSS', label: 'Nassau (Gross)' },
+  { value: 'NASSAU_NET', label: 'Nassau (Net)' },
+  { value: 'MATCH_GROSS', label: 'Match (Gross)' },
+  { value: 'MATCH_NET', label: 'Match (Net)' },
 ]
 
 interface Props {
@@ -96,14 +98,14 @@ function PlayerMultiSelect({
 }
 
 export function CreateSideBetModal({ roundId, members, currentUserId, onClose, onCreated }: Props) {
-  const [betType, setBetType] = useState<SideBetType>('CHALLENGE_GROSS')
-  const [isPublic, setIsPublic] = useState(false)
+  const [betType, setBetType] = useState<SideBetType>('STROKE_GROSS')
   const [invitedIds, setInvitedIds] = useState<string[]>([])
   const [wager, setWager] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const otherMembers = members.filter((m) => m.uid !== currentUserId)
+  const isNassau = betType === 'NASSAU_GROSS' || betType === 'NASSAU_NET'
 
   async function handleCreate() {
     setError('')
@@ -112,17 +114,12 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
       setError('Enter a valid wager amount.')
       return
     }
-    if (!isPublic && invitedIds.length === 0) {
-      setError('Invite at least one player, or make the bet public.')
-      return
-    }
     setSaving(true)
     try {
       await sideBetService.createSideBet(roundId, {
         type: betType,
         wagerPerPerson: wagerNum,
         createdBy: currentUserId,
-        isPublic,
         invitedIds,
       })
       onCreated()
@@ -153,92 +150,55 @@ export function CreateSideBetModal({ roundId, members, currentUserId, onClose, o
             colorScheme="blue"
           />
 
-          <>
-              {/* Visibility toggle */}
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-muted">Visibility</span>
-                <div className="flex rounded-lg overflow-hidden border border-card-border">
-                  <button
-                    type="button"
-                    onClick={() => setIsPublic(false)}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                      !isPublic
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-btn-secondary text-muted hover:text-brand'
-                    }`}
-                  >
-                    Private
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsPublic(true)}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                      isPublic
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-btn-secondary text-muted hover:text-brand'
-                    }`}
-                  >
-                    Public
-                  </button>
-                </div>
-                <p className="text-xs text-muted px-1">
-                  {isPublic
-                    ? 'Anyone in the round can join this bet.'
-                    : 'Only people you invite can join this bet.'}
-                </p>
-              </div>
+          {/* Invite players */}
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted">Invite Players (optional)</span>
+            <p className="text-xs text-muted px-1">All round members can see and request to join this bet.</p>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
+              <span className="text-sm text-blue-300 flex-1">
+                {members.find((m) => m.uid === currentUserId)?.displayName ?? 'You'}
+              </span>
+              <span className="text-xs text-blue-500">You (in)</span>
+            </div>
+            <PlayerMultiSelect
+              options={otherMembers}
+              selected={invitedIds}
+              onChange={setInvitedIds}
+            />
+          </div>
 
-              {/* Invite players */}
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-muted">
-                  {isPublic ? 'Pre-invite Players (optional)' : 'Invite Players'}
-                </span>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                  <span className="text-sm text-blue-300 flex-1">
-                    {members.find((m) => m.uid === currentUserId)?.displayName ?? 'You'}
-                  </span>
-                  <span className="text-xs text-blue-500">You (in)</span>
-                </div>
-                <PlayerMultiSelect
-                  options={otherMembers}
-                  selected={invitedIds}
-                  onChange={setInvitedIds}
-                />
-              </div>
+          {/* Wager */}
+          <div className="flex flex-col gap-1">
+            <Input
+              label="Wager per person ($)"
+              type="number"
+              min="0"
+              step="0.50"
+              value={wager}
+              onChange={(e) => setWager(e.target.value)}
+              placeholder="e.g. 5"
+            />
+            {isNassau ? (
+              <p className="text-xs text-muted px-1">
+                ${wager || 'X'} per segment (Front 9, Back 9, Total). Max exposure: ${wager ? (parseFloat(wager) * 3).toFixed(2) : '3X'} per person.
+              </p>
+            ) : (
+              <p className="text-xs text-muted px-1">
+                Each loser pays each winner ${wager || 'X'}. Winners collect from every other participant.
+              </p>
+            )}
+          </div>
 
-              {/* Wager */}
-              <div className="flex flex-col gap-1">
-                <Input
-                  label="Wager per person ($)"
-                  type="number"
-                  min="0"
-                  step="0.50"
-                  value={wager}
-                  onChange={(e) => setWager(e.target.value)}
-                  placeholder="e.g. 5"
-                />
-                {betType === 'NASSAU_GROSS' || betType === 'NASSAU_NET' ? (
-                  <p className="text-xs text-muted px-1">
-                    ${wager || 'X'} per segment (Front 9, Back 9, Total). Max exposure: ${wager ? (parseFloat(wager) * 3).toFixed(2) : '3X'} per person.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted px-1">
-                    Each loser pays each winner ${wager || 'X'}. Winners collect from every other participant.
-                  </p>
-                )}
-              </div>
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
-              {error && <p className="text-sm text-red-400">{error}</p>}
-
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={saving}
-                className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold transition-colors"
-              >
-                {saving ? 'Creating...' : 'Create Bet'}
-              </button>
-            </>
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={saving}
+            className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold transition-colors"
+          >
+            {saving ? 'Creating...' : 'Create Bet'}
+          </button>
         </div>
       </div>
     </div>

@@ -6,14 +6,16 @@ import { useSideBets } from '@/hooks/useSideBets'
 import { sideBetService } from '@/services/sideBetService'
 import { userService } from '@/services/userService'
 import { CreateSideBetModal } from '@/components/sideBets/CreateSideBetModal'
-import { Spinner, Badge } from '@/components/ui'
+import { Spinner } from '@/components/ui'
 import type { UserProfile, SideBet, SideBetType } from '@/types'
 
 export const BET_TYPE_LABELS: Record<SideBetType, string> = {
-  CHALLENGE_GROSS: 'Challenge (Gross)',
-  CHALLENGE_NET: 'Challenge (Net)',
+  STROKE_GROSS: 'Stroke (Gross)',
+  STROKE_NET: 'Stroke (Net)',
   NASSAU_GROSS: 'Nassau (Gross)',
   NASSAU_NET: 'Nassau (Net)',
+  MATCH_GROSS: 'Match (Gross)',
+  MATCH_NET: 'Match (Net)',
 }
 
 export function SideBetsPage() {
@@ -27,6 +29,7 @@ export function SideBetsPage() {
   const navigate = useNavigate()
 
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({})
+  const [profilesLoaded, setProfilesLoaded] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [actionError, setActionError] = useState('')
 
@@ -40,10 +43,11 @@ export function SideBetsPage() {
         if (p) map[uid] = p
       }
       setProfiles(map)
+      setProfilesLoaded(true)
     })
   }, [round])
 
-  if (roundLoading || !round) {
+  if (roundLoading || !round || !profilesLoaded) {
     return <div className="flex justify-center py-12"><Spinner /></div>
   }
 
@@ -52,20 +56,16 @@ export function SideBetsPage() {
   const members = (round.memberIds ?? []).map((id) => profiles[id]).filter(Boolean) as UserProfile[]
   const roundIsActive = round.status === 'active' || round.status === 'completed'
 
-  const myBets = sideBets.filter(
-    (b) => b.participantIds.includes(uid) || b.invitedIds.includes(uid)
-  )
-
   function getName(id: string) {
     return profiles[id]?.displayName ?? id
   }
 
-  async function handleJoin(bet: SideBet) {
+  async function handleRequestJoin(bet: SideBet) {
     setActionError('')
     try {
-      await sideBetService.joinBet(roundId!, bet.sideBetId, uid, bet.participantIds, bet.type)
+      await sideBetService.requestJoin(roundId!, bet.sideBetId, uid)
     } catch {
-      setActionError('Failed to join bet.')
+      setActionError('Failed to request to join bet.')
     }
   }
 
@@ -107,55 +107,29 @@ export function SideBetsPage() {
 
       {!isScramble && (
         <>
-          {/* My Side Bets */}
-          <section>
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">My Side Bets</h2>
-            {myBets.length === 0 ? (
-              <p className="text-sm text-muted text-center py-4">You have no side bets in this round.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {myBets.map((bet) => (
-                  <BetCard
-                    key={bet.sideBetId}
-                    bet={bet}
-                    uid={uid}
-                    roundId={roundId!}
-                    roundIsActive={roundIsActive}
-                    getName={getName}
-                    onJoin={handleJoin}
-                    navigate={navigate}
-                    from={from}
-                    fromGroupId={fromGroupId}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* All Side Bets */}
-          <section>
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">All Side Bets</h2>
-            {sideBets.length === 0 ? (
-              <p className="text-sm text-muted text-center py-4">No side bets yet. Be the first to create one!</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {sideBets.map((bet) => (
-                  <BetCard
-                    key={bet.sideBetId}
-                    bet={bet}
-                    uid={uid}
-                    roundId={roundId!}
-                    roundIsActive={roundIsActive}
-                    getName={getName}
-                    onJoin={handleJoin}
-                    navigate={navigate}
-                    from={from}
-                    fromGroupId={fromGroupId}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+          {sideBets.length === 0 ? (
+            <p className="text-sm text-muted text-center py-4">No side bets yet. Be the first to create one!</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {[
+                ...sideBets.filter((b) => b.participantIds.includes(uid) || b.invitedIds.includes(uid) || (b.requestIds ?? []).includes(uid)),
+                ...sideBets.filter((b) => !b.participantIds.includes(uid) && !b.invitedIds.includes(uid) && !(b.requestIds ?? []).includes(uid)),
+              ].map((bet) => (
+                <BetCard
+                  key={bet.sideBetId}
+                  bet={bet}
+                  uid={uid}
+                  roundId={roundId!}
+                  roundIsActive={roundIsActive}
+                  getName={getName}
+                  onRequestJoin={handleRequestJoin}
+                  navigate={navigate}
+                  from={from}
+                  fromGroupId={fromGroupId}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -181,7 +155,7 @@ function BetCard({
   roundId,
   roundIsActive,
   getName,
-  onJoin,
+  onRequestJoin,
   navigate,
   from,
   fromGroupId,
@@ -191,20 +165,21 @@ function BetCard({
   roundId: string
   roundIsActive: boolean
   getName: (id: string) => string
-  onJoin: (bet: SideBet) => void
+  onRequestJoin: (bet: SideBet) => void
   navigate: ReturnType<typeof useNavigate>
   from: string | null
   fromGroupId: string | null
 }) {
   const isInvited = bet.invitedIds.includes(uid)
   const isParticipant = bet.participantIds.includes(uid)
-  const canJoin = bet.isPublic && !isParticipant && !isInvited && bet.status === 'pending' && !roundIsActive
+  const hasRequested = (bet.requestIds ?? []).includes(uid)
+  const canRequestJoin = !isParticipant && !isInvited && !hasRequested && bet.status === 'pending' && !roundIsActive
 
-  const statusVariant = {
-    pending: 'yellow',
-    active: 'blue',
-    settled: 'blue',
-    cancelled: 'gray',
+  const statusBadgeClass = {
+    pending:   'bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/30',
+    active:    'bg-blue-600/10 text-blue-600 ring-1 ring-blue-600/30',
+    settled:   'bg-green-600/10 text-green-700 ring-1 ring-green-600/30',
+    cancelled: 'bg-red-500/10 text-danger ring-1 ring-red-500/30',
   } as const
 
   return (
@@ -213,67 +188,75 @@ function BetCard({
       onClick={() => navigate(`/rounds/${roundId}/side-bets/${bet.sideBetId}${from === 'scorecard' && fromGroupId ? `?from=scorecard&groupId=${fromGroupId}` : ''}`)}
       className="w-full text-left bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-3 hover:border-blue-600/50 transition-colors"
     >
-      {/* Type + status row */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-brand">{BET_TYPE_LABELS[bet.type]}</span>
-          {bet.isPublic && (
-            <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              Public
-            </span>
-          )}
-        </div>
-        <Badge label={bet.status} variant={statusVariant[bet.status]} />
+      {/* Type + status badge */}
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">{BET_TYPE_LABELS[bet.type] ?? bet.type}</span>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${statusBadgeClass[bet.status]}`}>
+          {bet.status.charAt(0).toUpperCase() + bet.status.slice(1)}
+        </span>
       </div>
 
-      {/* Participant chips */}
+      {/* Participant chips — accepted first (green), invited/pending (gold), declined (red) */}
       <div className="flex flex-wrap gap-1.5">
         {bet.participantIds.map((id) => (
-          <span
-            key={id}
-            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-              bet.winnersIds?.includes(id)
-                ? 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/50'
-                : 'bg-card-bg text-muted'
-            }`}
-          >
+          <span key={id} className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-600/10 text-green-700 ring-1 ring-green-600/30">
             {getName(id)}
           </span>
         ))}
         {bet.invitedIds.map((id) => (
-          <span key={id} className="px-2 py-0.5 rounded-full text-xs font-medium bg-card-bg/50 text-muted ring-1 ring-card-border">
-            {getName(id)} <span className="text-muted">?</span>
+          <span key={id} className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/30">
+            {getName(id)}
+          </span>
+        ))}
+        {bet.declinedIds.map((id) => (
+          <span key={id} className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-danger ring-1 ring-red-500/30">
+            {getName(id)}
           </span>
         ))}
       </div>
 
-      {/* Wager */}
-      <p className="text-sm text-muted">
-        ${bet.wagerPerPerson.toFixed(2)} <span className="text-muted">/ person</span>
-      </p>
+      {/* Wager + accepted badge */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted">
+          ${bet.wagerPerPerson.toFixed(2)} / person
+        </p>
+        {isParticipant && (
+          <span className="text-xs font-semibold text-green-700 bg-green-600/10 rounded-full px-2 py-0.5 ring-1 ring-green-600/30">
+            {bet.createdBy === uid ? 'Initiated' : 'Accepted'}
+          </span>
+        )}
+      </div>
 
       {/* Winner */}
       {bet.status === 'settled' && (
         <p className="text-sm font-semibold text-blue-400">
           {bet.winnersIds?.length === 0
-            ? '🤝 Tie'
-            : `🏆 ${bet.winnersIds?.map(getName).join(' / ')}`}
+            ? 'Tie'
+            : `${bet.winnersIds?.map(getName).join(' / ')}`}
         </p>
       )}
 
       {/* Invited indicator */}
       {isInvited && (
-        <p className="text-xs text-blue-400">You've been invited — tap to respond</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-blue-600">You've been invited — tap to respond</p>
+          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-600 text-white shrink-0">Invited</span>
+        </div>
       )}
 
-      {/* Join button for public bets */}
-      {canJoin && (
+      {/* Pending request indicator */}
+      {hasRequested && (
+        <p className="text-xs text-yellow-400">Join request pending approval</p>
+      )}
+
+      {/* Request to join button */}
+      {canRequestJoin && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onJoin(bet) }}
-          className="w-full h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+          onClick={(e) => { e.stopPropagation(); onRequestJoin(bet) }}
+          className="w-full h-9 rounded-lg bg-card-bg border border-card-border hover:border-blue-600/50 text-brand text-sm font-semibold transition-colors"
         >
-          Join Bet
+          Request to Join
         </button>
       )}
     </button>

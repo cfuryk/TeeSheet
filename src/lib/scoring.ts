@@ -342,7 +342,7 @@ export function nassauSegmentStatus(
   }
   const complete = participantIds.every((uid) => playerScores[uid] !== null)
   const scored = participantIds.filter((uid) => playerScores[uid] !== null)
-  if (scored.length === 0) return { leaders: [], playerScores, complete }
+  if (scored.length === 0 || !complete) return { leaders: [], playerScores, complete }
   const min = Math.min(...scored.map((uid) => playerScores[uid] as number))
   const leaders = scored.filter((uid) => playerScores[uid] === min)
   return { leaders, playerScores, complete }

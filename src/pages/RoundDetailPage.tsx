@@ -265,9 +265,20 @@ export function RoundDetailPage() {
                             </div>
                         </div>
                     )}
-                    <Button onClick={() => navigate(`/rounds/${round.roundId}/summary?from=round`)}>
-                        Leaderboard & Scorecards
-                    </Button>
+                    <div className="flex gap-3">
+                        <Button onClick={() => navigate(`/rounds/${round.roundId}/summary?from=round`)} className="flex-1">
+                            Leaderboard & Scorecards
+                        </Button>
+                        {round.scoringFormat !== 'scramble' && (
+                            <button
+                                type="button"
+                                onClick={() => navigate(`/rounds/${round.roundId}/side-bets`)}
+                                className="flex-1 h-9 px-4 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+                            >
+                                Side Bets
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -283,29 +294,31 @@ export function RoundDetailPage() {
                 const invitedBets = sideBets.filter((b) => b.invitedIds.includes(uid) && b.status === 'pending')
                 if (invitedBets.length === 0) return null
                 return (
-                    <div className="bg-blue-600/10 border border-blue-600/40 rounded-xl overflow-hidden">
-                        <div className="px-4 py-3 flex items-center justify-between">
-                            <span className="text-sm font-semibold text-blue-400">Bet Invites ({invitedBets.length})</span>
-                            <span className="text-xs text-blue-400 animate-pulse">Action needed</span>
+                    <div className="bg-card-bg rounded-xl border border-card-border overflow-hidden">
+                        <div className="bg-blue-600 px-4 py-2.5 flex items-center justify-between gap-3">
+                            <span className="text-sm font-bold text-white">Bet Invites ({invitedBets.length})</span>
+                            <span className="text-xs font-semibold text-white/70 animate-pulse">Action needed</span>
                         </div>
-                        <div className="border-t border-blue-600/30 flex flex-col divide-y divide-blue-600/20">
+                        <div className="flex flex-col divide-y divide-card-border">
                             {invitedBets.map((bet) => (
                                 <button
                                     key={bet.sideBetId}
                                     type="button"
                                     onClick={() => navigate(`/rounds/${round.roundId}/side-bets/${bet.sideBetId}`)}
-                                    className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-blue-600/10 transition-colors"
+                                    className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-blue-600/5 transition-colors"
                                 >
                                     <div className="flex flex-col gap-0.5 min-w-0">
-                                        <span className="text-sm font-semibold text-blue-300">
+                                        <span className="text-sm font-semibold text-blue-600">
                                             {bet.type === 'NASSAU_GROSS' ? 'Nassau (Gross)'
                                             : bet.type === 'NASSAU_NET' ? 'Nassau (Net)'
-                                            : bet.type === 'CHALLENGE_GROSS' ? 'Challenge (Gross)'
-                                            : 'Challenge (Net)'}
+                                            : bet.type === 'STROKE_GROSS' ? 'Stroke (Gross)'
+                                            : bet.type === 'STROKE_NET' ? 'Stroke (Net)'
+                                            : bet.type === 'MATCH_GROSS' ? 'Match (Gross)'
+                                            : 'Match (Net)'}
                                         </span>
-                                        <span className="text-xs text-blue-400">${bet.wagerPerPerson.toFixed(2)} / {bet.type.startsWith('NASSAU') ? 'segment' : 'person'}</span>
+                                        <span className="text-xs text-muted">${bet.wagerPerPerson.toFixed(2)} / {bet.type.startsWith('NASSAU') ? 'segment' : 'person'}</span>
                                     </div>
-                                    <span className="text-xs font-semibold text-blue-300 shrink-0">Tap to respond →</span>
+                                    <span className="text-xs font-semibold text-blue-600 shrink-0">Tap to respond →</span>
                                 </button>
                             ))}
                         </div>

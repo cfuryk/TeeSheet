@@ -72,8 +72,12 @@ service cloud.firestore {
       allow read: if isAuthed()
         && (request.auth.uid == resource.data.golferId || isAdmin());
 
+      // Own score, or any round member writing on behalf of another member at round completion
       allow create: if isAuthed()
-        && request.resource.data.golferId == request.auth.uid;
+        && (request.resource.data.golferId == request.auth.uid
+          || isAdmin()
+          || (request.resource.data.roundId != null
+            && isRoundMember(request.resource.data.roundId)));
 
       allow update: if isAuthed()
         && (resource.data.golferId == request.auth.uid || isAdmin());
@@ -164,12 +168,15 @@ service cloud.firestore {
           && (isAdmin() || isRoundMember(roundId) || isEventMemberOfRound(roundId))
           && request.resource.data.createdBy == request.auth.uid;
 
-        // Participants can update (accept/decline/join); creator or admin can cancel/settle
+        // Participants can update (accept/decline/join); creator or admin can cancel/settle;
+        // any round member can settle (triggered client-side when round completes)
         allow update: if isAuthed()
           && (isAdmin()
             || resource.data.createdBy == request.auth.uid
             || request.auth.uid in resource.data.participantIds
-            || request.auth.uid in resource.data.invitedIds);
+            || request.auth.uid in resource.data.invitedIds
+            || isRoundMember(roundId)
+            || isEventMemberOfRound(roundId));
 
         allow delete: if isAuthed()
           && (isAdmin() || resource.data.createdBy == request.auth.uid);

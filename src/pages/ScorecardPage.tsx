@@ -17,6 +17,7 @@ import { ScrambleScoreSummary } from '@/components/scorecard/ScrambleScoreSummar
 import { ScorecardGrid } from '@/components/scorecard/ScorecardGrid'
 import { RoundChat } from '@/components/scorecard/RoundChat'
 import { ActiveBetsPanel } from '@/components/sideBets/ActiveBetsPanel'
+import { useSideBets } from '@/hooks/useSideBets'
 import { TabBar, Spinner } from '@/components/ui'
 import type { Score, Group, Hole } from '@/types'
 
@@ -67,6 +68,7 @@ export function ScorecardPage() {
     const { currentUser, userProfile } = useAuth()
     const navigate = useNavigate()
     const allRoundScores = useRoundScores(roundId)
+    const { sideBets } = useSideBets(roundId!)
     const [currentHole, setCurrentHole] = useState(1)
     const [holeInitialised, setHoleInitialised] = useState(false)
     const startingRef = useRef(false)
@@ -278,11 +280,12 @@ export function ScorecardPage() {
     }
 
     // Build tab list
+    const invitedBetCount = sideBets.filter((b) => b.invitedIds.includes(currentUser!.uid) && b.status === 'pending').length
     const tabs = [
         { key: 'scoring', label: 'Scoring' },
         ...(!isScramble ? [{ key: 'scorecard', label: 'Card' }] : []),
         { key: 'leaderboard', label: 'Leaders' },
-        ...(!isScramble && !isSoloRound ? [{ key: 'bets', label: 'Bets' }] : []),
+        ...(!isScramble && !isSoloRound ? [{ key: 'bets', label: 'Bets', alertCount: invitedBetCount }] : []),
     ]
 
     // If stored tab is not valid for this round type, fall back to scoring

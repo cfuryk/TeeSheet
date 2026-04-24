@@ -7,12 +7,12 @@ import { scoreService } from '@/services/scoreService'
 import { userService } from '@/services/userService'
 import { sideBetService } from '@/services/sideBetService'
 import { nassauSegmentStatus } from '@/lib/scoring'
-import { Spinner, Badge } from '@/components/ui'
+import { Spinner } from '@/components/ui'
 import { BET_TYPE_LABELS } from '@/pages/SideBetsPage'
 import type { Score, SideBet, SideBetType } from '@/types'
 
 function isNetType(type: SideBetType) {
-  return type === 'CHALLENGE_NET' || type === 'NASSAU_NET'
+  return type === 'STROKE_NET' || type === 'NASSAU_NET' || type === 'MATCH_NET'
 }
 
 function isNassauType(type: SideBetType) {
@@ -43,24 +43,33 @@ export function SideBetDetailPage() {
 
   const [scores, setScores] = useState<Record<string, Score>>({})
   const [names, setNames] = useState<Record<string, string>>({})
+  const [namesLoaded, setNamesLoaded] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [inviteIds, setInviteIds] = useState<string[]>([])
+  const [inviting, setInviting] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
 
   const bet = sideBets.find((b) => b.sideBetId === sideBetId)
-  const allRelevantIds = bet
-    ? [...new Set([...bet.participantIds, ...bet.invitedIds])]
-    : []
 
   useEffect(() => {
-    if (allRelevantIds.length === 0) return
+    if (!bet || !round) return
+    const allIds = [...new Set([
+      ...bet.participantIds,
+      ...bet.invitedIds,
+      ...(bet.requestIds ?? []),
+      ...(bet.declinedIds ?? []),
+      ...(round.memberIds ?? []),
+    ])]
     Promise.all(
-      allRelevantIds.map((uid) => userService.getProfile(uid).then((p) => ({ uid, name: p?.displayName ?? uid })))
+      allIds.map((uid) => userService.getProfile(uid).then((p) => ({ uid, name: p?.displayName ?? uid })))
     ).then((results) => {
       const map: Record<string, string> = {}
       for (const { uid, name } of results) map[uid] = name
       setNames(map)
+      setNamesLoaded(true)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bet?.sideBetId])
+  }, [bet?.sideBetId, round?.roundId])
 
   useEffect(() => {
     if (!round || !bet || bet.participantIds.length === 0) return
@@ -85,7 +94,7 @@ export function SideBetDetailPage() {
     if (!bet) return
     setActionError('')
     try {
-      await sideBetService.acceptInvite(roundId!, bet.sideBetId, uid, bet.createdBy, bet.type)
+      await sideBetService.acceptInvite(roundId!, bet.sideBetId, uid)
     } catch {
       setActionError('Failed to accept invite.')
     }
@@ -101,13 +110,38 @@ export function SideBetDetailPage() {
     }
   }
 
-  async function handleJoin() {
+  async function handleApproveRequest(requestUid: string) {
     if (!bet) return
     setActionError('')
     try {
-      await sideBetService.joinBet(roundId!, bet.sideBetId, uid, bet.participantIds, bet.type)
+      await sideBetService.approveJoinRequest(roundId!, bet.sideBetId, requestUid)
     } catch {
-      setActionError('Failed to join bet.')
+      setActionError('Failed to approve request.')
+    }
+  }
+
+  async function handleDenyRequest(requestUid: string) {
+    if (!bet) return
+    setActionError('')
+    try {
+      await sideBetService.denyJoinRequest(roundId!, bet.sideBetId, requestUid)
+    } catch {
+      setActionError('Failed to deny request.')
+    }
+  }
+
+  async function handleInvite() {
+    if (!bet || inviteIds.length === 0) return
+    setInviting(true)
+    setActionError('')
+    try {
+      await sideBetService.invitePlayers(roundId!, bet.sideBetId, inviteIds)
+      setInviteIds([])
+      setShowInvite(false)
+    } catch {
+      setActionError('Failed to send invites.')
+    } finally {
+      setInviting(false)
     }
   }
 
@@ -141,37 +175,41 @@ export function SideBetDetailPage() {
     )
   }
 
+  if (!namesLoaded) {
+    return <div className="flex justify-center py-12"><Spinner /></div>
+  }
+
   const b: SideBet = bet
   const useNet = isNetType(b.type)
   const isNassau = isNassauType(b.type)
-  const roundIsActive = round?.status === 'active' || round?.status === 'completed'
 
   const isInvited = b.invitedIds.includes(uid)
   const isParticipant = b.participantIds.includes(uid)
+  const hasRequested = (b.requestIds ?? []).includes(uid)
   const canAccept = isInvited && b.status === 'pending'
-  const canDecline = isInvited && b.status === 'pending'
-  const canJoin = b.isPublic && !isParticipant && !isInvited && b.status === 'pending' && !roundIsActive
-  const canCancel = b.createdBy === uid && b.status === 'pending'
 
-  const statusVariant = {
-    pending: 'yellow',
-    active: 'blue',
-    settled: 'blue',
-    cancelled: 'gray',
-  } as const
+  const alreadyOnBet = new Set([
+    ...b.participantIds,
+    ...b.invitedIds,
+    ...(b.requestIds ?? []),
+    ...(b.declinedIds ?? []),
+  ])
+  const inviteableMembers = (round?.memberIds ?? []).filter((id) => !alreadyOnBet.has(id))
+  const canDecline = isInvited && b.status === 'pending'
+  const canCancel = b.createdBy === uid && b.status === 'pending'
+  const pendingRequests = isParticipant ? (b.requestIds ?? []) : []
 
   function getName(id: string) {
     return names[id] ?? id
   }
 
-  function getTotal(uid: string): number | null {
-    const sc = scores[uid]
+  function getTotal(id: string): number | null {
+    const sc = scores[id]
     if (!sc || sc.scores.length === 0) return null
     if (useNet) return sc.scores.reduce((s, h) => s + h.netScore, 0)
     return sc.scores.reduce((s, h) => s + h.grossScore, 0)
   }
 
-  // Ranked participants for standing (only those with scores)
   const ranked = b.participantIds
     .map((id) => ({ id, total: getTotal(id), holes: scores[id]?.scores.length ?? 0 }))
     .sort((a, b) => {
@@ -220,18 +258,18 @@ export function SideBetDetailPage() {
       )
     }
 
-    // Challenge settled
+    // Stroke / Match settled
     if (b.status === 'settled') {
       const winners = b.winnersIds ?? []
       if (winners.length === 0) {
-        return <p className="text-base font-semibold text-brand">🤝 Complete tie — no money changes hands</p>
+        return <p className="text-base font-semibold text-brand">Complete tie — no money changes hands</p>
       }
       const pot = b.participantIds.length * b.wagerPerPerson
       const eachWinnerCollects = pot / winners.length
       return (
         <div className="flex flex-col gap-2">
           <p className="text-base font-semibold text-blue-400">
-            🏆 {winners.map(getName).join(' & ')} won
+            {winners.map(getName).join(' & ')} won
           </p>
           <p className="text-sm text-muted">
             Pot: <span className="text-brand font-medium">${pot.toFixed(2)}</span>
@@ -261,7 +299,7 @@ export function SideBetDetailPage() {
             const { leaders, playerScores, complete } = nassauSegmentStatus(
               b.participantIds, scoreMap, key, useNet
             )
-            const anyScored = b.participantIds.some((uid) => playerScores[uid] !== null)
+            const anyScored = b.participantIds.some((id) => playerScores[id] !== null)
             return (
               <div key={key}>
                 <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">{label}</p>
@@ -295,7 +333,7 @@ export function SideBetDetailPage() {
       )
     }
 
-    // Active challenge — live standing
+    // Active stroke / match — live standing
     if (!leader || leader.total === null) {
       return <p className="text-sm text-muted italic">No scores yet</p>
     }
@@ -327,6 +365,13 @@ export function SideBetDetailPage() {
     )
   }
 
+  const statusBadgeClass = {
+    pending:   'bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/30',
+    active:    'bg-blue-600/10 text-blue-600 ring-1 ring-blue-600/30',
+    settled:   'bg-green-600/10 text-green-700 ring-1 ring-green-600/30',
+    cancelled: 'bg-red-500/10 text-danger ring-1 ring-red-500/30',
+  } as const
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -334,23 +379,18 @@ export function SideBetDetailPage() {
         <button
           type="button"
           onClick={handleBack}
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition-colors"
+          className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
         >
           {backLabel}
         </button>
-        <div className="flex items-center gap-2">
-          {b.isPublic && (
-            <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              Public
-            </span>
-          )}
-          <Badge label={b.status} variant={statusVariant[b.status]} />
-        </div>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass[b.status]}`}>
+          {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
+        </span>
       </div>
 
       {/* Bet info */}
       <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-1">
-        <p className="text-base font-semibold text-brand">{BET_TYPE_LABELS[b.type]}</p>
+        <p className="text-base font-semibold text-brand">{BET_TYPE_LABELS[b.type] ?? b.type}</p>
         {isNassau ? (
           <p className="text-sm text-muted">
             ${b.wagerPerPerson.toFixed(2)} <span className="text-muted">/ segment · Front 9, Back 9, Total · max ${(b.wagerPerPerson * 3).toFixed(2)} / person</span>
@@ -359,6 +399,93 @@ export function SideBetDetailPage() {
           <p className="text-sm text-muted">
             ${b.wagerPerPerson.toFixed(2)} <span className="text-muted">/ person · everyone vs everyone</span>
           </p>
+        )}
+      </div>
+
+      {/* Players */}
+      <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+        <div className="bg-blue-600 px-4 py-2.5">
+          <h2 className="text-sm font-bold text-white">Players</h2>
+        </div>
+        <div className="flex flex-col divide-y divide-card-border">
+          {b.participantIds.map((id) => (
+            <div key={id} className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm font-medium text-brand">{getName(id)}</span>
+              <span className="text-xs font-semibold text-green-700 bg-green-600/10 rounded-full px-2 py-0.5 ring-1 ring-green-600/30">{id === b.createdBy ? 'Initiated' : 'Accepted'}</span>
+            </div>
+          ))}
+          {b.invitedIds.map((id) => (
+            <div key={id} className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm font-medium text-muted">{getName(id)}</span>
+              <span className="text-xs font-semibold text-yellow-700 bg-yellow-500/10 rounded-full px-2 py-0.5 ring-1 ring-yellow-500/30">Invited</span>
+            </div>
+          ))}
+          {(b.requestIds ?? []).map((id) => (
+            <div key={id} className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm font-medium text-muted">{getName(id)}</span>
+              <span className="text-xs font-semibold text-blue-600 bg-blue-600/10 rounded-full px-2 py-0.5 ring-1 ring-blue-600/30">Requested</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Invite more players — only for participants, pending/active, with someone left to invite */}
+        {isParticipant && b.status !== 'settled' && b.status !== 'cancelled' && inviteableMembers.length > 0 && (
+          <div className="border-t border-card-border px-4 py-3 flex flex-col gap-2">
+            {!showInvite ? (
+              <button
+                type="button"
+                onClick={() => setShowInvite(true)}
+                className="w-full h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+              >
+                + Invite Players
+              </button>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                  {inviteableMembers.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setInviteIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                        inviteIds.includes(id)
+                          ? 'bg-blue-600/10 text-blue-600 ring-1 ring-blue-600/30'
+                          : 'text-brand hover:bg-blue-600/5'
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                        inviteIds.includes(id) ? 'bg-blue-600 border-blue-600' : 'border-card-border'
+                      }`}>
+                        {inviteIds.includes(id) && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </span>
+                      {getName(id)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleInvite}
+                    disabled={inviteIds.length === 0 || inviting}
+                    className="flex-1 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+                  >
+                    {inviting ? 'Sending...' : `Send Invite${inviteIds.length > 1 ? 's' : ''}`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowInvite(false); setInviteIds([]) }}
+                    className="h-8 px-3 rounded-lg bg-card-bg border border-card-border text-brand text-xs font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -411,14 +538,47 @@ export function SideBetDetailPage() {
 
       {/* Standing */}
       <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-2">
-        <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Standing</h2>
+        <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Bet Status</h2>
         {standingBlock()}
       </div>
 
+      {/* Pending join requests — visible to participants */}
+      {pendingRequests.length > 0 && (
+        <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-3">
+          <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Join Requests</h2>
+          {pendingRequests.map((reqUid) => (
+            <div key={reqUid} className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-brand">{getName(reqUid)}</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleApproveRequest(reqUid)}
+                  className="px-3 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDenyRequest(reqUid)}
+                  className="px-3 h-8 rounded-lg bg-card-bg border border-card-border hover:border-red-500/50 text-brand text-xs font-semibold transition-colors"
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {actionError && <p className="text-sm text-danger">{actionError}</p>}
 
+      {/* My status indicators */}
+      {hasRequested && !isParticipant && (
+        <p className="text-sm text-yellow-400 text-center">Your join request is pending approval.</p>
+      )}
+
       {/* Actions */}
-      {(canAccept || canDecline || canJoin || canCancel) && (
+      {(canAccept || canDecline || canCancel) && (
         <div className="flex gap-3">
           {canAccept && (
             <button
@@ -433,25 +593,16 @@ export function SideBetDetailPage() {
             <button
               type="button"
               onClick={handleDecline}
-              className="flex-1 h-9 rounded-xl bg-card-bg hover:bg-card-bg text-brand text-sm font-semibold transition-colors border border-card-border"
+              className="flex-1 h-9 rounded-xl bg-danger hover:bg-danger-hover text-white text-sm font-semibold transition-colors"
             >
               Decline
-            </button>
-          )}
-          {canJoin && (
-            <button
-              type="button"
-              onClick={handleJoin}
-              className="flex-1 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
-            >
-              Join Bet
             </button>
           )}
           {canCancel && (
             <button
               type="button"
               onClick={handleCancel}
-              className="flex-1 h-9 rounded-xl bg-card-bg hover:bg-card-bg text-brand text-sm font-semibold transition-colors border border-card-border"
+              className="flex-1 h-9 rounded-xl bg-danger hover:bg-danger-hover text-white text-sm font-semibold transition-colors"
             >
               Cancel Bet
             </button>

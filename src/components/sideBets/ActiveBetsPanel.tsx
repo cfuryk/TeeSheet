@@ -94,8 +94,10 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
   const betTypeLabel = (bet: SideBet) =>
     bet.type === 'NASSAU_GROSS' ? 'Nassau (Gross)'
     : bet.type === 'NASSAU_NET' ? 'Nassau (Net)'
-    : bet.type === 'CHALLENGE_GROSS' ? 'Challenge (Gross)'
-    : 'Challenge (Net)'
+    : bet.type === 'STROKE_GROSS' ? 'Stroke (Gross)'
+    : bet.type === 'STROKE_NET' ? 'Stroke (Net)'
+    : bet.type === 'MATCH_GROSS' ? 'Match (Gross)'
+    : 'Match (Net)'
 
   function betLink(bet: SideBet) {
     navigate(`/rounds/${roundId}/side-bets/${bet.sideBetId}?from=scorecard&groupId=${groupId}`)
@@ -105,26 +107,26 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
     <div className="flex flex-col gap-3">
       {/* Invited bets — always shown when present */}
       {invitedBets.length > 0 && (
-        <div className="bg-blue-600/10 border border-blue-600/40 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-blue-400">
+        <div className="bg-card-bg rounded-xl border border-card-border overflow-hidden">
+          <div className="bg-blue-600 px-4 py-2.5 flex items-center justify-between gap-3">
+            <span className="text-sm font-bold text-white">
               Bet Invites ({invitedBets.length})
             </span>
-            <span className="text-xs text-blue-400 animate-pulse">Action needed</span>
+            <span className="text-xs font-semibold text-white/70 animate-pulse">Action needed</span>
           </div>
-          <div className="border-t border-blue-600/30 flex flex-col divide-y divide-blue-600/20">
+          <div className="flex flex-col divide-y divide-card-border">
             {invitedBets.map((bet) => (
               <button
                 key={bet.sideBetId}
                 type="button"
                 onClick={() => betLink(bet)}
-                className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-blue-600/10 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-blue-600/5 transition-colors"
               >
                 <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-sm font-semibold text-blue-300">{betTypeLabel(bet)}</span>
-                  <span className="text-xs text-blue-400">${bet.wagerPerPerson.toFixed(2)} / {bet.type.startsWith('NASSAU') ? 'segment' : 'person'}</span>
+                  <span className="text-sm font-semibold text-blue-600">{betTypeLabel(bet)}</span>
+                  <span className="text-xs text-muted">${bet.wagerPerPerson.toFixed(2)} / {bet.type.startsWith('NASSAU') ? 'segment' : 'person'}</span>
                 </div>
-                <span className="text-xs font-semibold text-blue-300 shrink-0">Tap to respond →</span>
+                <span className="text-xs font-semibold text-blue-600 shrink-0">Tap to respond →</span>
               </button>
             ))}
           </div>
@@ -141,15 +143,15 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
           Side Bets
         </button>
       ) : (
-        <div className="bg-card-bg border border-blue-600/40 rounded-xl overflow-hidden">
+        <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
           <button
             type="button"
             onClick={toggle}
-            className="w-full px-4 py-3 flex items-center justify-between text-left bg-blue-600/10"
+            className="w-full px-4 py-2.5 flex items-center justify-between text-left bg-blue-600"
           >
-            <span className="text-sm font-semibold text-blue-400">Side Bets ({myBets.length})</span>
+            <span className="text-sm font-bold text-white">Side Bets ({myBets.length})</span>
             <svg
-              className={`w-4 h-4 text-blue-400 transition-transform ${open ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -157,10 +159,10 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
           </button>
 
           {open && (
-            <div className="border-t border-blue-600/30 flex flex-col divide-y divide-card-border">
+            <div className="flex flex-col divide-y divide-card-border">
               {myBets.map((bet) => {
                 const isNassau = bet.type === 'NASSAU_GROSS' || bet.type === 'NASSAU_NET'
-                const useNet = bet.type === 'NASSAU_NET' || bet.type === 'CHALLENGE_NET'
+                const useNet = bet.type === 'NASSAU_NET' || bet.type === 'STROKE_NET' || bet.type === 'MATCH_NET'
                 return (
                   <button
                     key={bet.sideBetId}

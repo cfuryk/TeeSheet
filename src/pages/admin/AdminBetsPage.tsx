@@ -24,7 +24,6 @@ interface UnifiedBet {
   participantNames: string[]
   winnersNames: string[]
   isTie: boolean
-  isPublic: boolean
   // for navigation
   sideBetId?: string
   // raw createdAt for sorting
@@ -32,10 +31,12 @@ interface UnifiedBet {
 }
 
 const BET_TYPE_LABELS: Record<SideBetType, string> = {
-  CHALLENGE_GROSS: 'Challenge (Gross)',
-  CHALLENGE_NET: 'Challenge (Net)',
+  STROKE_GROSS: 'Stroke (Gross)',
+  STROKE_NET: 'Stroke (Net)',
   NASSAU_GROSS: 'Nassau (Gross)',
   NASSAU_NET: 'Nassau (Net)',
+  MATCH_GROSS: 'Match (Gross)',
+  MATCH_NET: 'Match (Net)',
 }
 
 const SIDE_BET_STATUS_VARIANT: Record<SideBetStatus, 'gray' | 'blue' | 'green' | 'yellow'> = {
@@ -210,7 +211,6 @@ export function AdminBetsPage() {
         participantNames: [...b.participantIds.map((u) => names[u] ?? u), ...b.invitedIds.map((u) => `${names[u] ?? u}?`)],
         winnersNames: winners.map((u) => names[u] ?? u),
         isTie: b.status === 'settled' && winners.length === 0,
-        isPublic: b.isPublic,
         sideBetId: b.sideBetId,
         createdAt: b.createdAt as { seconds: number } | null,
       })
@@ -229,7 +229,6 @@ export function AdminBetsPage() {
         participantNames: (r.memberIds ?? []).map((u) => names[u] ?? u),
         winnersNames: [],
         isTie: false,
-        isPublic: !r.isPrivate,
         createdAt: r.createdAt as { seconds: number } | null,
       })
     }

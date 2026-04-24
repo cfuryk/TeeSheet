@@ -6,7 +6,6 @@ import { useEvent } from '@/hooks/useEvent'
 import { useAuth } from '@/hooks/useAuth'
 import { useMyRounds } from '@/hooks/useMyRounds'
 import { Spinner, Card } from '@/components/ui'
-import { formatDate } from '@/lib/formatters'
 import { USBROPEN_EVENT_ID } from '@/config/usbropen'
 import type { Round } from '@/types'
 
@@ -54,7 +53,7 @@ function useMyGroup(roundId: string | undefined, userId: string | undefined) {
 
 export function TeeSheetPage() {
     const { currentUser, loading: authLoading } = useAuth()
-    const { event, loading: eventLoading } = useEvent(USBROPEN_EVENT_ID)
+    const { event } = useEvent(USBROPEN_EVENT_ID)
     const { rounds } = useBropenRounds(USBROPEN_EVENT_ID)
     const { rounds: myRounds } = useMyRounds(currentUser?.uid ?? '')
 
@@ -62,7 +61,7 @@ export function TeeSheetPage() {
         (r) => !r.eventId && (r.status === 'active' || r.status === 'pending')
     )
 
-    const loading = authLoading || eventLoading
+    // const loading = authLoading || eventLoading
 
     const activeRound = currentUser && event && event.memberIds?.includes(currentUser.uid)
         ? rounds.find((r) => r.status === 'active')
@@ -71,14 +70,14 @@ export function TeeSheetPage() {
     const { groupId: myGroupId, groupLoading } = useMyGroup(activeRound?.roundId, currentUser?.uid)
 
     // Compute display date: range from earliest to latest round, or event date
-    const dateDisplay = (() => {
+    /*const dateDisplay = (() => {
         if (rounds.length === 0 || !event) return event ? formatDate(event.date) : null
 
         const sorted = [...rounds].sort((a, b) => a.date.seconds - b.date.seconds)
         const first = formatDate(sorted[0].date)
         const last = formatDate(sorted[sorted.length - 1].date)
         return first === last ? first : `${first} – ${last}`
-    })()
+    })()*/
 
     if (authLoading) {
         return (
@@ -90,7 +89,7 @@ export function TeeSheetPage() {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Event info */}
+            {/* Event info
             {loading ? (
                 <div className="flex justify-center py-16"><Spinner size="lg" /></div>
             ) : event ? (
@@ -116,14 +115,12 @@ export function TeeSheetPage() {
                 </div>
             ) : (
                 <div className="text-center py-16 text-muted">Event not found.</div>
-            )}
-
-            {/* Open Event */}
+            )} */}
             <Link
                 to={`/events/${USBROPEN_EVENT_ID}`}
                 className="bg-brand hover:bg-brand-hover text-white text-center h-9 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center"
             >
-                Event Details
+                Click For US Bropen Event Details
             </Link>
 
             {/* Active round callout */}

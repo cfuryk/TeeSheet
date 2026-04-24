@@ -20,8 +20,8 @@ import type { SideBet, SideBetStatus, SideBetType } from '@/types'
 import type { Score } from '@/types'
 
 const IMPLEMENTED_TYPES: SideBetType[] = [
-  'CHALLENGE_GROSS',
-  'CHALLENGE_NET',
+  'STROKE_GROSS',
+  'STROKE_NET',
   'NASSAU_GROSS',
   'NASSAU_NET',
 ]
@@ -41,7 +41,6 @@ export const sideBetService = {
       type: SideBetType
       wagerPerPerson: number
       createdBy: string
-      isPublic: boolean
       invitedIds: string[]
     },
   ): Promise<string> {
@@ -49,12 +48,12 @@ export const sideBetService = {
       roundId,
       type: data.type,
       status: 'pending' as SideBetStatus,
-      isPublic: data.isPublic,
       wagerPerPerson: data.wagerPerPerson,
       createdBy: data.createdBy,
       participantIds: [data.createdBy],
       invitedIds: data.invitedIds,
       declinedIds: [],
+      requestIds: [],
       winnersIds: null,
       settledAt: null,
       createdAt: serverTimestamp(),
@@ -65,17 +64,16 @@ export const sideBetService = {
     return ref.id
   },
 
-  /** Invited person accepts — moves them from invitedIds to participantIds */
+  /** Invited person accepts — moves them from invitedIds to participantIds, activates the bet */
   async acceptInvite(
     roundId: string,
     sideBetId: string,
     uid: string,
-    _creatorUid: string,
-    _betType: SideBetType,
   ): Promise<void> {
     await updateDoc(sideBetDocPath(roundId, sideBetId), {
       participantIds: arrayUnion(uid),
       invitedIds: arrayRemove(uid),
+      status: 'active' as SideBetStatus,
       updatedAt: serverTimestamp(),
     })
   },
@@ -94,16 +92,35 @@ export const sideBetService = {
     await updateDoc(sideBetDocPath(roundId, sideBetId), updates)
   },
 
-  /** Public bet — any round member joins freely */
-  async joinBet(
-    roundId: string,
-    sideBetId: string,
-    uid: string,
-    _existingParticipantIds: string[],
-    _betType: SideBetType,
-  ): Promise<void> {
+  /** Participant invites additional players */
+  async invitePlayers(roundId: string, sideBetId: string, uids: string[]): Promise<void> {
+    await updateDoc(sideBetDocPath(roundId, sideBetId), {
+      invitedIds: arrayUnion(...uids),
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  /** Non-participant requests to join — added to requestIds pending approval */
+  async requestJoin(roundId: string, sideBetId: string, uid: string): Promise<void> {
+    await updateDoc(sideBetDocPath(roundId, sideBetId), {
+      requestIds: arrayUnion(uid),
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  /** Existing participant approves a join request */
+  async approveJoinRequest(roundId: string, sideBetId: string, uid: string): Promise<void> {
     await updateDoc(sideBetDocPath(roundId, sideBetId), {
       participantIds: arrayUnion(uid),
+      requestIds: arrayRemove(uid),
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  /** Existing participant denies a join request */
+  async denyJoinRequest(roundId: string, sideBetId: string, uid: string): Promise<void> {
+    await updateDoc(sideBetDocPath(roundId, sideBetId), {
+      requestIds: arrayRemove(uid),
       updatedAt: serverTimestamp(),
     })
   },
@@ -162,11 +179,10 @@ export const sideBetService = {
       if (bet.participantIds.length < 2) continue
 
       const isNassau = bet.type === 'NASSAU_GROSS' || bet.type === 'NASSAU_NET'
-      const useNet = bet.type === 'CHALLENGE_NET' || bet.type === 'NASSAU_NET'
+      const useNet = bet.type === 'STROKE_NET' || bet.type === 'NASSAU_NET'
       const participantScores = allScores.filter((s) => bet.participantIds.includes(s.golferId))
 
       if (isNassau) {
-        // All 18 holes must be complete for all participants
         const allComplete = bet.participantIds.every((uid) => {
           const sc = participantScores.find((s) => s.golferId === uid)
           return sc && nassauSegmentScore(sc.scores, 'total', useNet) !== null
@@ -181,7 +197,7 @@ export const sideBetService = {
           }
           const min = Math.min(...Object.values(segScores))
           const winners = bet.participantIds.filter((uid) => segScores[uid] === min)
-          return winners.length === bet.participantIds.length ? [] : winners // empty = all tied
+          return winners.length === bet.participantIds.length ? [] : winners
         }
 
         batch.update(sideBetDocPath(roundId, bet.sideBetId), {
@@ -198,7 +214,7 @@ export const sideBetService = {
         continue
       }
 
-      // Challenge bets
+      // Stroke bets
       const totals: Record<string, number> = {}
       for (const sc of participantScores) {
         const val = useNet ? sc.totalNet : sc.totalGross
