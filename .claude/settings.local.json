@@ -19,7 +19,10 @@
       "Bash(node scripts/seed.mjs)",
       "Bash(firebase projects:list)",
       "Bash(firebase use:*)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(rm:*)",
+      "Bash(ls \"C:/Users/I835849/OneDrive - SAP SE/3. INFO PERSONAL/GolfApp/TeeSheet\"/*.json)",
+      "Bash(gcloud storage:*)"
     ]
   }
 }
