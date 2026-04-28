@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSideBets } from '@/hooks/useSideBets'
 import { scoreService } from '@/services/scoreService'
 import { useGroups } from '@/hooks/useGroup'
-import { nassauSegmentStatus } from '@/lib/scoring'
+import { nassauSegmentStatus, computeMatchScore } from '@/lib/scoring'
 import { usePanelState } from '@/hooks/usePanelState'
 import type { Score, SideBet } from '@/types'
 
@@ -97,7 +97,11 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
     : bet.type === 'STROKE_GROSS' ? 'Stroke (Gross)'
     : bet.type === 'STROKE_NET' ? 'Stroke (Net)'
     : bet.type === 'MATCH_GROSS' ? 'Match (Gross)'
-    : 'Match (Net)'
+    : bet.type === 'MATCH_NET' ? 'Match (Net)'
+    : bet.type === 'HAMMER' ? 'Hammer'
+    : bet.type === 'SKINS_GROSS' ? 'Skins (Gross)'
+    : bet.type === 'SKINS_NET' ? 'Skins (Net)'
+    : bet.type
 
   function betLink(bet: SideBet) {
     navigate(`/rounds/${roundId}/side-bets/${bet.sideBetId}?from=scorecard&groupId=${groupId}`)
@@ -162,7 +166,93 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
             <div className="flex flex-col divide-y divide-card-border">
               {myBets.map((bet) => {
                 const isNassau = bet.type === 'NASSAU_GROSS' || bet.type === 'NASSAU_NET'
-                const useNet = bet.type === 'NASSAU_NET' || bet.type === 'STROKE_NET' || bet.type === 'MATCH_NET'
+                const isHammer = bet.type === 'HAMMER'
+                const isSkins = bet.type === 'SKINS_GROSS' || bet.type === 'SKINS_NET'
+                const isMatch = bet.type === 'MATCH_GROSS' || bet.type === 'MATCH_NET'
+                const useNet = bet.type === 'NASSAU_NET' || bet.type === 'STROKE_NET' || bet.type === 'MATCH_NET' || bet.type === 'SKINS_NET'
+
+                // Hammer running net from current user's perspective
+                let hammerLabel = '—'
+                let hammerColor = 'text-muted'
+                if (isHammer && bet.hammerConfig) {
+                  const cfg = bet.hammerConfig
+                  const onSideA = cfg.sideA.includes(uid)
+                  let net = 0
+                  for (const r of cfg.holeResults) {
+                    if (r.foldedBy === 'B' || r.winningSide === 'A') net += r.stake
+                    else if (r.foldedBy === 'A' || r.winningSide === 'B') net -= r.stake
+                  }
+                  const myNet = onSideA ? net : -net
+                  if (myNet > 0) { hammerLabel = `+$${myNet.toFixed(2)}`; hammerColor = 'text-green-400' }
+                  else if (myNet < 0) { hammerLabel = `-$${Math.abs(myNet).toFixed(2)}`; hammerColor = 'text-danger' }
+                  else hammerLabel = 'Even'
+                }
+
+                // Skins: live estimate from skinsResult or compute from current scores
+                let skinsLabel = '—'
+                let skinsColor = 'text-muted'
+                if (isSkins) {
+                  if (bet.skinsResult) {
+                    const earned = bet.skinsResult.earningsByPlayer[uid] ?? 0
+                    const net = earned - bet.wagerPerPerson
+                    if (net > 0) { skinsLabel = `+$${net.toFixed(2)}`; skinsColor = 'text-green-400' }
+                    else if (net < 0) { skinsLabel = `-$${Math.abs(net).toFixed(2)}`; skinsColor = 'text-danger' }
+                    else skinsLabel = 'Even'
+                  } else {
+                    // Live: count holes won so far
+                    const myScores = scores[uid]
+                    if (myScores) {
+                      let skinsWon = 0
+                      for (let hole = 1; hole <= 18; hole++) {
+                        const myHole = myScores.scores.find((h) => h.hole === hole)
+                        if (!myHole) continue
+                        const myScore = useNet ? myHole.netScore : myHole.grossScore
+                        if (myScore == null) continue
+                        const allScored = bet.participantIds.every((pid) => {
+                          const sc = scores[pid]
+                          const hs = sc?.scores.find((h) => h.hole === hole)
+                          return hs && (useNet ? hs.netScore : hs.grossScore) != null
+                        })
+                        if (!allScored) continue
+                        const allHoleScores = bet.participantIds.map((pid) => {
+                          const sc = scores[pid]
+                          const hs = sc?.scores.find((h) => h.hole === hole)
+                          return useNet ? hs?.netScore : hs?.grossScore
+                        }).filter((s): s is number => s != null)
+                        const minScore = Math.min(...allHoleScores)
+                        const winners = bet.participantIds.filter((pid) => {
+                          const sc = scores[pid]
+                          const hs = sc?.scores.find((h) => h.hole === hole)
+                          const s = useNet ? hs?.netScore : hs?.grossScore
+                          return s === minScore
+                        })
+                        if (winners.length === 1 && winners[0] === uid) skinsWon++
+                      }
+                      skinsLabel = `${skinsWon} skin${skinsWon !== 1 ? 's' : ''}`
+                      skinsColor = skinsWon > 0 ? 'text-green-400' : 'text-muted'
+                    }
+                  }
+                }
+
+                // Match Play running score from current user's perspective
+                let matchLabel = '—'
+                let matchColor = 'text-muted'
+                if (isMatch && bet.matchPlayers) {
+                  const mp = bet.matchPlayers
+                  const { aWins, bWins, holesPlayed, matchStatus } = computeMatchScore(mp.sideA, mp.sideB, scores, useNet)
+                  if (holesPlayed === 0) {
+                    matchLabel = '—'
+                  } else {
+                    const myOnA = mp.sideA.includes(uid)
+                    const myOnB = mp.sideB.includes(uid)
+                    const aUp = aWins - bWins
+                    const myUp = myOnA ? aUp : myOnB ? -aUp : 0
+                    if (myUp > 0) { matchLabel = matchStatus; matchColor = 'text-green-400' }
+                    else if (myUp < 0) { matchLabel = matchStatus; matchColor = 'text-danger' }
+                    else { matchLabel = matchStatus; matchColor = 'text-muted' }
+                  }
+                }
+
                 return (
                   <button
                     key={bet.sideBetId}
@@ -171,7 +261,15 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
                     className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-card-bg transition-colors"
                   >
                     <span className="text-sm font-semibold text-brand shrink-0">{betTypeLabel(bet)}</span>
-                    {isNassau ? (
+                    {isHammer ? (
+                      <span className={`text-xs font-medium ml-auto shrink-0 ${hammerColor}`}>
+                        {hammerLabel}
+                      </span>
+                    ) : isSkins ? (
+                      <span className={`text-xs font-medium ml-auto shrink-0 ${skinsColor}`}>
+                        {skinsLabel}
+                      </span>
+                    ) : isNassau ? (
                       <div className="flex gap-2 text-xs font-medium shrink-0 ml-auto">
                         {(['front', 'back', 'total'] as const).map((seg) => {
                           const val = nassauSegmentLabel(bet, scores, seg, useNet, uid)
@@ -182,6 +280,10 @@ export function ActiveBetsPanel({ roundId, uid, groupId }: Props) {
                           return <span key={seg} className={color}>{segLabel}: {val}</span>
                         })}
                       </div>
+                    ) : isMatch ? (
+                      <span className={`text-xs font-medium ml-auto shrink-0 ${matchColor}`}>
+                        {matchLabel}
+                      </span>
                     ) : (
                       <span className={`text-xs font-medium ml-auto shrink-0 ${
                         challengeStanding(bet, scores, useNet, uid) === 'Leading' ? 'text-green-400'

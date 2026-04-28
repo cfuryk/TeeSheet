@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { InstallPromptModal } from '@/components/layout/InstallPromptModal'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -47,6 +48,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <InstallPromptModal />
         <ScrollToTop />
         <Routes>
           {/* Public auth routes */}

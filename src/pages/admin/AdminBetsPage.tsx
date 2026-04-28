@@ -37,6 +37,9 @@ const BET_TYPE_LABELS: Record<SideBetType, string> = {
   NASSAU_NET: 'Nassau (Net)',
   MATCH_GROSS: 'Match (Gross)',
   MATCH_NET: 'Match (Net)',
+  HAMMER: 'Hammer',
+  SKINS_GROSS: 'Skins (Gross)',
+  SKINS_NET: 'Skins (Net)',
 }
 
 const SIDE_BET_STATUS_VARIANT: Record<SideBetStatus, 'gray' | 'blue' | 'green' | 'yellow'> = {

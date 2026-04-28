@@ -122,8 +122,11 @@ export function RoundDetailPage() {
     const allGroupsSigned = groups.length > 0 && groups.every((g) => g.status === 'signed')
     const canForceComplete = isStandalone && isCreator && (round.status === 'active' || (isCompleted && !allGroupsSigned))
 
-    // Compute winner summary for completed rounds
-    const winnerSummary = isCompleted && allScores.length > 0 ? computeWinner(round, groups, allScores) : null
+    // Compute winner summary for completed rounds — only for team/match formats, not plain stroke play
+    const isTeamOrMatchFormat = round.roundType.startsWith('TWO_TEAM') || round.roundType.startsWith('BEST_BALL')
+    const winnerSummary = isCompleted && allScores.length > 0 && isTeamOrMatchFormat
+        ? computeWinner(round, groups, allScores)
+        : null
 
     async function handleJoin(targetGroupId?: string) {
         setJoining(true)
@@ -148,9 +151,9 @@ export function RoundDetailPage() {
         setDeleting(true)
         try {
             const memberIds = round!.memberIds ?? []
-            await golferScoreService.deleteScoresByRound(round!.roundId)
+            await golferScoreService.deleteScoresByRound(round!.roundId).catch(() => { /* best-effort */ })
             await roundService.deleteRound(round!.roundId)
-            await Promise.all(memberIds.map((id) => userService.recalculateHandicap(id)))
+            Promise.all(memberIds.map((id) => userService.recalculateHandicap(id))).catch(() => { /* best-effort */ })
             navigate('/')
         } catch {
             setError('Failed to delete round.')
@@ -267,7 +270,7 @@ export function RoundDetailPage() {
                     )}
                     <div className="flex gap-3">
                         <Button onClick={() => navigate(`/rounds/${round.roundId}/summary?from=round`)} className="flex-1">
-                            Leaderboard & Scorecards
+                            Scores
                         </Button>
                         {round.scoringFormat !== 'scramble' && (
                             <button
@@ -282,8 +285,8 @@ export function RoundDetailPage() {
                 </div>
             )}
 
-            {/* Activate Round — admin only, pending */}
-            {round.status === 'pending' && isAdmin && groups.length > 0 && (
+            {/* Activate Round — creator or admin, pending */}
+            {round.status === 'pending' && (isCreator || isAdmin) && groups.length > 0 && (
                 <Button loading={activating} onClick={handleActivate} className="w-full">
                     Activate Round
                 </Button>

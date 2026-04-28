@@ -305,6 +305,100 @@ export function twoTeamBestBallAggregateScore(
   return total
 }
 
+// ─── Match Play (side bet) helpers ────────────────────────────────────────────
+
+/**
+ * Determines the winner of a single hole for a Match Play side bet.
+ * For 2v2, uses best-ball (lowest score) from each side.
+ * Returns null if either side has no score for this hole yet.
+ */
+export function computeMatchHole(
+  hole: number,
+  sideA: string[],
+  sideB: string[],
+  scores: Record<string, Score>,
+  useNet: boolean,
+): 'A' | 'B' | 'tie' | null {
+  const getScore = (uid: string): number | null => {
+    const hs = scores[uid]?.scores.find((h) => h.hole === hole)
+    if (!hs) return null
+    return useNet ? hs.netScore : hs.grossScore
+  }
+  const aScores = sideA.map(getScore).filter((s): s is number => s !== null)
+  const bScores = sideB.map(getScore).filter((s): s is number => s !== null)
+  if (aScores.length === 0 || bScores.length === 0) return null
+  const aMin = Math.min(...aScores)
+  const bMin = Math.min(...bScores)
+  if (aMin < bMin) return 'A'
+  if (bMin < aMin) return 'B'
+  return 'tie'
+}
+
+/**
+ * Computes the running match score from all available holes.
+ * Returns hole-by-hole results, running tally, and match status string.
+ */
+export function computeMatchScore(
+  sideA: string[],
+  sideB: string[],
+  scores: Record<string, Score>,
+  useNet: boolean,
+): {
+  holeByHole: { hole: number; winner: 'A' | 'B' | 'tie'; aScore: number | null; bScore: number | null }[]
+  aWins: number
+  bWins: number
+  ties: number
+  holesPlayed: number
+  matchStatus: string
+} {
+  const holeByHole: { hole: number; winner: 'A' | 'B' | 'tie'; aScore: number | null; bScore: number | null }[] = []
+
+  const getScore = (uid: string, hole: number): number | null => {
+    const hs = scores[uid]?.scores.find((h) => h.hole === hole)
+    if (!hs) return null
+    return useNet ? hs.netScore : hs.grossScore
+  }
+
+  for (let hole = 1; hole <= 18; hole++) {
+    const aScores = sideA.map((uid) => getScore(uid, hole)).filter((s): s is number => s !== null)
+    const bScores = sideB.map((uid) => getScore(uid, hole)).filter((s): s is number => s !== null)
+    if (aScores.length === 0 || bScores.length === 0) continue
+    const aMin = Math.min(...aScores)
+    const bMin = Math.min(...bScores)
+    const winner: 'A' | 'B' | 'tie' = aMin < bMin ? 'A' : bMin < aMin ? 'B' : 'tie'
+    holeByHole.push({ hole, winner, aScore: aMin, bScore: bMin })
+  }
+
+  let aWins = 0, bWins = 0, ties = 0
+  for (const r of holeByHole) {
+    if (r.winner === 'A') aWins++
+    else if (r.winner === 'B') bWins++
+    else ties++
+  }
+  const holesPlayed = holeByHole.length
+  const holesRemaining = 18 - holesPlayed
+  const aUp = aWins - bWins
+
+  let matchStatus: string
+  if (holesPlayed === 0) {
+    matchStatus = 'No holes played'
+  } else if (aUp === 0) {
+    matchStatus = holesRemaining === 0 ? 'Halved' : `All Square thru ${holesPlayed}`
+  } else {
+    const absUp = Math.abs(aUp)
+    const leadingSide = aUp > 0 ? 'A' : 'B'
+    if (absUp > holesRemaining) {
+      matchStatus = `${leadingSide === 'A' ? 'A' : 'B'} won ${absUp}&${holesRemaining}`
+    } else if (absUp === holesRemaining) {
+      matchStatus = `Dormie ${absUp}`
+    } else {
+      matchStatus = `${leadingSide} ${absUp} UP thru ${holesPlayed}`
+    }
+  }
+
+  return { holeByHole, aWins, bWins, ties, holesPlayed, matchStatus }
+}
+
 // ─── Nassau helpers ────────────────────────────────────────────────────────────
 
 /**

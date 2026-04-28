@@ -7,6 +7,7 @@ import { useGroups } from '@/hooks/useGroup'
 import { useAuth } from '@/hooks/useAuth'
 import { scoreService } from '@/services/scoreService'
 import { groupService } from '@/services/groupService'
+import { sideBetService } from '@/services/sideBetService'
 import { roundChatService } from '@/services/roundChatService'
 import { buildScoringAlerts } from '@/lib/scoringAlerts'
 import { HoleInfo } from '@/components/scorecard/HoleInfo'
@@ -16,6 +17,7 @@ import { MatchScoreSummary } from '@/components/scorecard/MatchScoreSummary'
 import { ScrambleScoreSummary } from '@/components/scorecard/ScrambleScoreSummary'
 import { ScorecardGrid } from '@/components/scorecard/ScorecardGrid'
 import { RoundChat } from '@/components/scorecard/RoundChat'
+import { HammerBetBar } from '@/components/scorecard/HammerBetBar'
 import { ActiveBetsPanel } from '@/components/sideBets/ActiveBetsPanel'
 import { useSideBets } from '@/hooks/useSideBets'
 import { TabBar, Spinner } from '@/components/ui'
@@ -192,6 +194,21 @@ export function ScorecardPage() {
         />
     )
 
+    const uid = currentUser!.uid
+    const hammerBet = !isScramble
+        ? sideBets.find(
+            (b) =>
+                b.type === 'HAMMER' &&
+                (b.status === 'active' || b.status === 'pending') &&
+                b.hammerConfig != null &&
+                b.participantIds.includes(uid) &&
+                group.golferIds.some((id) => b.participantIds.includes(id)),
+          ) ?? null
+        : null
+    const hammerMySide = hammerBet
+        ? (hammerBet.hammerConfig!.sideA.includes(uid) ? 'A' : 'B')
+        : null
+
     async function handleScoreSelect(grossScore: number) {
         if (!myScore) return
         const netScore = grossScore - myStrokes
@@ -238,6 +255,36 @@ export function ScorecardPage() {
                 }
             }
         }
+
+        // Auto-record hammer hole result when navigating away from a scored hole
+        if (hammerBet && hammerBet.hammerConfig) {
+            const cfg = hammerBet.hammerConfig
+            // Never overwrite a conceded hole
+            const existingResult = cfg.holeResults.find((r) => r.hole === currentHole)
+            if (!existingResult || existingResult.foldedBy === null) {
+            const holeScoreFor = (uids: string[], useNet: boolean): number | null => {
+                const holeScores = uids.map((uid) => {
+                    const sc = allRoundScores.find((s) => s.golferId === uid)
+                    const hs = sc?.scores.find((s) => s.hole === currentHole)
+                    return hs ? (useNet ? hs.netScore : hs.grossScore) : null
+                })
+                if (holeScores.some((s) => s === null)) return null
+                return Math.min(...(holeScores as number[]))
+            }
+            const useNet = cfg.scoring === 'net'
+            const sideAScore = holeScoreFor(cfg.sideA, useNet)
+            const sideBScore = holeScoreFor(cfg.sideB, useNet)
+            if (sideAScore !== null && sideBScore !== null) {
+                const winningSide: 'A' | 'B' | 'tie' =
+                    sideAScore < sideBScore ? 'A' : sideBScore < sideAScore ? 'B' : 'tie'
+                sideBetService.recordHoleResult(
+                    roundId!, hammerBet.sideBetId, currentHole,
+                    winningSide, cfg.currentHoleStake, cfg.currentHoleHammers, cfg.baseStake,
+                ).catch(() => { /* non-critical */ })
+            }
+            } // end concede guard
+        }
+
         holeSnapshotRef.current[nextHole] = myScore?.scores.find((s) => s.hole === nextHole)?.grossScore ?? null
         setCurrentHole(nextHole)
     }
@@ -323,6 +370,9 @@ export function ScorecardPage() {
                                 onSelect={handleScoreSelect}
                                 strokes={isNetRound && myScore && !isScramble ? myStrokes : 0}
                                 navigation={nav}
+                                hammerBar={hammerBet && hammerMySide
+                                    ? <HammerBetBar bet={hammerBet} currentHole={currentHole} uid={uid} mySide={hammerMySide} />
+                                    : undefined}
                                 golferName={myScore?.golferName}
                                 courseHandicap={isScramble ? undefined : myScore?.courseHandicap}
                                 vsPar={myVsPar}

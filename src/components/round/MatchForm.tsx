@@ -142,8 +142,6 @@ const MATCH_TYPES_BY_FORMAT: Record<TeamFormat, { value: string; label: string }
     { value: 'STROKE', label: 'Stroke' },
     { value: 'NASSAU', label: 'Nassau' },
     { value: 'MATCH_PLAY', label: 'Match Play' },
-    { value: 'HAMMER', label: 'Hammer' },
-    { value: 'SKINS', label: 'Skins' },
   ],
   AGGREGATE: [
     { value: 'STROKE', label: 'Stroke' },
@@ -153,16 +151,12 @@ const MATCH_TYPES_BY_FORMAT: Record<TeamFormat, { value: string; label: string }
     { value: 'STROKE', label: 'Stroke' },
     { value: 'NASSAU', label: 'Nassau' },
     { value: 'MATCH_PLAY', label: 'Match Play' },
-    { value: 'HAMMER', label: 'Hammer' },
-    { value: 'SKINS', label: 'Skins' },
   ],
   H2H_2V2: [
     { value: 'STROKE', label: 'Stroke' },
     { value: 'NASSAU', label: 'Nassau' },
     { value: 'BEST_BALL', label: 'Best Ball' },
-    { value: 'HAMMER', label: 'Hammer' },
     { value: 'HIGH_LOW', label: 'High Low' },
-    { value: 'SKINS', label: 'Skins' },
   ],
 }
 

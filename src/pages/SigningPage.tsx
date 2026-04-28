@@ -61,13 +61,13 @@ export function SigningPage() {
         Back to Round
       </button>
 
-      {/* Header + signing actions */}
+      {/* Header + signing actions — hidden once all signed */}
+      {!allSigned && (
       <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
         <div className="p-4">
           <h1 className="text-xl font-bold text-brand">Sign Scorecard</h1>
           <p className="text-muted text-sm mt-0.5">{round.courseName} · {round.teeName}</p>
         </div>
-        {!allSigned && (
           <div className="border-t border-card-border">
             {isScramble ? (
               <div className="flex items-center justify-between px-4 py-3">
@@ -102,33 +102,51 @@ export function SigningPage() {
               </div>
             )}
           </div>
-        )}
       </div>
+      )}
 
       {error && <Alert message={error} />}
 
-      {allSigned ? (
-        <div className="flex flex-col items-center gap-4 py-8">
-          <div className="text-5xl">✓</div>
-          <p className="text-xl font-bold text-brand">All Signed!</p>
-          <p className="text-muted text-sm">Scores are locked.</p>
-          <Button onClick={() => navigate(`/rounds/${roundId}/summary`)}>
-            View Summary
-          </Button>
-        </div>
-      ) : (
+      {allSigned && (
         <>
-          {/* Aggregate scorecard */}
-          <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
-            <div className="p-4">
-              <ScorecardGrid scores={scores} holes={tee.holes} isNet={isNet} bare fullNames={isScramble} />
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-green-800">All Signed &amp; Locked</p>
+              <p className="text-xs text-green-700">Scores are final.</p>
             </div>
           </div>
 
-          <p className="text-xs text-muted text-center px-2">
-            Round chat is automatically deleted 7 days after the round ends.
-          </p>
+          {/* Signatures summary */}
+          <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+            <div className="divide-y divide-card-border">
+              {scores.map((sc) => (
+                <div key={sc.golferId} className="flex items-center justify-between px-4 py-3">
+                  <span className="font-semibold text-brand text-sm">{sc.golferName}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-danger text-xl" style={{ fontFamily: "'Dancing Script', cursive" }}>
+                      {sc.golferName}
+                    </span>
+                    <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </>
+      )}
+
+      {/* Scorecard — always visible */}
+      <ScorecardGrid scores={scores} holes={tee.holes} isNet={isNet} bare fullNames={isScramble} />
+
+      {!allSigned && (
+        <p className="text-xs text-muted text-center px-2">
+          Round chat is automatically deleted 7 days after the round ends.
+        </p>
       )}
     </div>
   )

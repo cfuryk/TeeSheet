@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useRound } from '@/hooks/useRound'
+import { useGroups } from '@/hooks/useGroup'
 import { useSideBets } from '@/hooks/useSideBets'
 import { sideBetService } from '@/services/sideBetService'
 import { userService } from '@/services/userService'
@@ -16,6 +17,9 @@ export const BET_TYPE_LABELS: Record<SideBetType, string> = {
   NASSAU_NET: 'Nassau (Net)',
   MATCH_GROSS: 'Match (Gross)',
   MATCH_NET: 'Match (Net)',
+  HAMMER: 'Hammer',
+  SKINS_GROSS: 'Skins (Gross)',
+  SKINS_NET: 'Skins (Net)',
 }
 
 export function SideBetsPage() {
@@ -25,6 +29,7 @@ export function SideBetsPage() {
   const fromGroupId = searchParams.get('groupId')
   const { currentUser } = useAuth()
   const { round, loading: roundLoading } = useRound(roundId!)
+  const { groups } = useGroups(roundId!)
   const { sideBets } = useSideBets(roundId!)
   const navigate = useNavigate()
 
@@ -56,6 +61,12 @@ export function SideBetsPage() {
   const members = (round.memberIds ?? []).map((id) => profiles[id]).filter(Boolean) as UserProfile[]
   const roundIsActive = round.status === 'active' || round.status === 'completed'
 
+  // Group members for the current group context (used for Hammer bet)
+  const currentGroup = fromGroupId ? groups.find((g) => g.groupId === fromGroupId) : null
+  const groupMembers = currentGroup
+    ? currentGroup.golferIds.map((id) => profiles[id]).filter(Boolean) as UserProfile[]
+    : members
+
   function getName(id: string) {
     return profiles[id]?.displayName ?? id
   }
@@ -80,7 +91,7 @@ export function SideBetsPage() {
               ? navigate(`/rounds/${roundId}/groups/${fromGroupId}/scorecard`)
               : navigate(`/rounds/${roundId}`)
           }
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition-colors"
+          className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
         >
           {from === 'scorecard' ? 'Back to Score Entry' : 'Back to Round'}
         </button>
@@ -88,7 +99,7 @@ export function SideBetsPage() {
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition-colors"
+            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
           >
             + New Side Bet
           </button>
@@ -138,6 +149,8 @@ export function SideBetsPage() {
           roundId={roundId!}
           round={round}
           members={members}
+          groupMembers={groupMembers}
+          groupId={fromGroupId ?? undefined}
           currentUserId={uid}
           onClose={() => setShowCreate(false)}
           onCreated={() => setShowCreate(false)}

@@ -13,11 +13,12 @@ export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allSco
   const showReview = allScored && onLast
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <button
+        type="button"
         onClick={onPrev}
         disabled={currentHole === 1}
-        className="h-9 px-4 rounded-lg bg-btn-secondary hover:bg-card-bg border border-card-border text-sm font-semibold text-muted disabled:opacity-30"
+        className="h-9 px-4 rounded-lg bg-btn-secondary hover:bg-card-bg border border-card-border text-sm font-semibold text-muted disabled:opacity-30 shrink-0 inline-flex items-center justify-center"
       >
         ← Prev
       </button>
@@ -35,16 +36,18 @@ export function HoleNavigation({ currentHole, totalHoles, onPrev, onNext, allSco
       )}
       {showReview ? (
         <button
+          type="button"
           onClick={onReview}
-          className="h-9 px-4 rounded-lg bg-danger hover:bg-danger/90 text-sm font-semibold text-white"
+          className="h-9 px-4 rounded-lg bg-danger hover:bg-danger/90 text-sm font-semibold text-white shrink-0 inline-flex items-center justify-center"
         >
           Review Round
         </button>
       ) : (
         <button
+          type="button"
           onClick={onNext}
           disabled={onLast}
-          className="h-9 px-4 rounded-lg bg-brand hover:bg-brand-hover border border-brand text-sm font-semibold text-white disabled:opacity-30"
+          className="h-9 px-4 rounded-lg bg-brand hover:bg-brand-hover border border-brand text-sm font-semibold text-white disabled:opacity-30 shrink-0 inline-flex items-center justify-center"
         >
           Next →
         </button>

@@ -21,7 +21,7 @@ export type RoundType =
 
 export type RoundStatus = 'pending' | 'active' | 'completed'
 
-export type MatchType = 'STROKE' | 'NASSAU' | 'MATCH_PLAY' | 'HAMMER' | 'HIGH_LOW' | 'SKINS' | 'BEST_BALL'
+export type MatchType = 'STROKE' | 'NASSAU' | 'MATCH_PLAY' | 'HIGH_LOW' | 'BEST_BALL'
 
 /** How teams are structured in a match.
  *  INDIVIDUAL   — no teams; everyone plays for themselves

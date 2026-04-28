@@ -29,5 +29,5 @@ export type {
   ActiveGroupContext,
 } from './group'
 export type { GolferScore, ScoreSource } from './golferScore'
-export type { SideBet, SideBetType, SideBetStatus } from './sideBet'
+export type { SideBet, SideBetType, SideBetStatus, HammerFormat, HammerFirstRule, HammerHoleResult, HammerConfig, HammerResult, SkinsHoleResult, SkinsResult, MatchFormat, MatchPlayers } from './sideBet'
 export type { RoundMessage, AlertType } from './message'

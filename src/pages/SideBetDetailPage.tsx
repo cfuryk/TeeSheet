@@ -6,13 +6,13 @@ import { useSideBets } from '@/hooks/useSideBets'
 import { scoreService } from '@/services/scoreService'
 import { userService } from '@/services/userService'
 import { sideBetService } from '@/services/sideBetService'
-import { nassauSegmentStatus } from '@/lib/scoring'
+import { nassauSegmentStatus, computeMatchScore } from '@/lib/scoring'
 import { Spinner } from '@/components/ui'
 import { BET_TYPE_LABELS } from '@/pages/SideBetsPage'
 import type { Score, SideBet, SideBetType } from '@/types'
 
 function isNetType(type: SideBetType) {
-  return type === 'STROKE_NET' || type === 'NASSAU_NET' || type === 'MATCH_NET'
+  return type === 'STROKE_NET' || type === 'NASSAU_NET' || type === 'MATCH_NET' || type === 'SKINS_NET'
 }
 
 function isNassauType(type: SideBetType) {
@@ -182,6 +182,9 @@ export function SideBetDetailPage() {
   const b: SideBet = bet
   const useNet = isNetType(b.type)
   const isNassau = isNassauType(b.type)
+  const isHammer = b.type === 'HAMMER'
+  const isSkins = b.type === 'SKINS_GROSS' || b.type === 'SKINS_NET'
+  const isMatch = b.type === 'MATCH_GROSS' || b.type === 'MATCH_NET'
 
   const isInvited = b.invitedIds.includes(uid)
   const isParticipant = b.participantIds.includes(uid)
@@ -237,6 +240,106 @@ export function SideBetDetailPage() {
       return <p className="text-sm text-muted italic">Bet is open — waiting for round to begin.</p>
     }
 
+    // Hammer standing — running net per side
+    if (isHammer) {
+      const cfg = b.hammerConfig
+      if (!cfg) return <p className="text-sm text-muted italic">No data yet.</p>
+      const sideANames = cfg.sideA.map(getName).join(' & ')
+      const sideBNames = cfg.sideB.map(getName).join(' & ')
+      // Deduplicate by hole (arrayUnion on objects can produce duplicates)
+      const uniqueResults = Object.values(
+        Object.fromEntries(cfg.holeResults.map((r) => [r.hole, r]))
+      )
+      let sideANet = 0
+      for (const r of uniqueResults) {
+        if (r.foldedBy === 'B' || r.winningSide === 'A') sideANet += r.stake
+        else if (r.foldedBy === 'A' || r.winningSide === 'B') sideANet -= r.stake
+      }
+      const holesPlayed = uniqueResults.length
+      const netColor = (n: number) => n > 0 ? 'text-green-600' : n < 0 ? 'text-danger' : 'text-muted'
+      const fmt = (n: number) => n === 0 ? 'Even' : n > 0 ? `+$${n.toFixed(2)}` : `-$${Math.abs(n).toFixed(2)}`
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-brand">{sideANames}</span>
+            <span className={`text-sm font-bold ${netColor(sideANet)}`}>{fmt(sideANet)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-brand">{sideBNames}</span>
+            <span className={`text-sm font-bold ${netColor(-sideANet)}`}>{fmt(-sideANet)}</span>
+          </div>
+          <p className="text-xs text-muted">{holesPlayed}/18 holes recorded · ${cfg.baseStake.toFixed(2)} base stake</p>
+        </div>
+      )
+    }
+
+    // Skins standing
+    if (isSkins) {
+      const netColor = (n: number) => n > 0 ? 'text-green-600' : n < 0 ? 'text-danger' : 'text-muted'
+      const fmt = (n: number) => n === 0 ? 'Even' : n > 0 ? `+$${n.toFixed(2)}` : `-$${Math.abs(n).toFixed(2)}`
+      if (b.skinsResult) {
+        const { totalPot, skinsCount, payoutPerSkin, earningsByPlayer } = b.skinsResult
+        return (
+          <div className="flex flex-col gap-2">
+            {b.participantIds.map((pid) => {
+              const earned = earningsByPlayer[pid] ?? 0
+              const net = earned - b.wagerPerPerson
+              const skins = b.skinsResult!.holeResults.filter((r) => r.winnerId === pid).length
+              return (
+                <div key={pid} className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-brand">{getName(pid)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted">{skins} skin{skins !== 1 ? 's' : ''}</span>
+                    <span className={`text-sm font-bold ${netColor(net)}`}>{fmt(net)}</span>
+                  </div>
+                </div>
+              )
+            })}
+            <p className="text-xs text-muted">
+              Pot: ${totalPot.toFixed(2)} · {skinsCount} skin{skinsCount !== 1 ? 's' : ''} · ${payoutPerSkin.toFixed(2)} each
+            </p>
+          </div>
+        )
+      }
+      // Active — show live skin counts from scores
+      const skinsWonBy: Record<string, number> = {}
+      for (let hole = 1; hole <= 18; hole++) {
+        const holeScores: { uid: string; score: number }[] = []
+        for (const uid of b.participantIds) {
+          const sc = Object.values(scores).find((s) => s.golferId === uid)
+          const hs = sc?.scores.find((h) => h.hole === hole)
+          const score = hs ? (useNet ? hs.netScore : hs.grossScore) : null
+          if (score != null) holeScores.push({ uid, score })
+        }
+        if (holeScores.length < b.participantIds.length) continue
+        const min = Math.min(...holeScores.map((h) => h.score))
+        const winners = holeScores.filter((h) => h.score === min)
+        if (winners.length === 1) skinsWonBy[winners[0].uid] = (skinsWonBy[winners[0].uid] ?? 0) + 1
+      }
+      const totalPot = b.participantIds.length * b.wagerPerPerson
+      const totalSkins = Object.values(skinsWonBy).reduce((s, n) => s + n, 0)
+      const payoutEst = totalSkins > 0 ? totalPot / totalSkins : 0
+      return (
+        <div className="flex flex-col gap-2">
+          {b.participantIds.map((pid) => {
+            const skins = skinsWonBy[pid] ?? 0
+            const earned = skins * payoutEst
+            const net = earned - b.wagerPerPerson
+            return (
+              <div key={pid} className="flex items-center justify-between">
+                <span className="text-sm font-medium text-brand">{getName(pid)}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted">{skins} skin{skins !== 1 ? 's' : ''}</span>
+                  <span className={`text-sm font-bold ${netColor(net)}`}>{fmt(net)}</span>
+                </div>
+              </div>
+            )
+          })}
+          <p className="text-xs text-muted">Pot: ${totalPot.toFixed(2)} · {totalSkins} skin{totalSkins !== 1 ? 's' : ''} recorded so far</p>
+        </div>
+      )
+    }
+
     // Nassau settled
     if (b.status === 'settled' && isNassau) {
       const nr = b.nassauResult
@@ -254,6 +357,65 @@ export function SideBetDetailPage() {
           <div>{segmentSettled(nr?.front9Winners, 'Front 9')}</div>
           <div>{segmentSettled(nr?.back9Winners, 'Back 9')}</div>
           <div>{segmentSettled(nr?.totalWinners, 'Total')}</div>
+        </div>
+      )
+    }
+
+    // Match Play standing — before the generic settled block
+    if (isMatch && b.matchPlayers) {
+      const mp = b.matchPlayers
+      const sideANames = mp.sideA.map(getName).join(' & ')
+      const sideBNames = mp.sideB.map(getName).join(' & ')
+
+      if (b.status === 'settled') {
+        const winners = b.winnersIds ?? []
+        const wonSide = winners.length === 0 ? null
+          : mp.sideA.some((uid) => winners.includes(uid)) ? 'A' : 'B'
+        if (wonSide === null) {
+          return (
+            <div className="flex flex-col gap-1">
+              <p className="text-base font-semibold text-brand">Match Halved</p>
+              <p className="text-xs text-muted">No money changes hands</p>
+            </div>
+          )
+        }
+        const { holeByHole, aWins, bWins } = computeMatchScore(mp.sideA, mp.sideB, scores, useNet)
+        const holesPlayed = holeByHole.length
+        const holesRemaining = 18 - holesPlayed
+        const absUp = Math.abs(aWins - bWins)
+        const margin = holesRemaining === 0 ? `${absUp} UP` : `${absUp}&${holesRemaining}`
+        const winnerNames = wonSide === 'A' ? sideANames : sideBNames
+        const loserNames = wonSide === 'A' ? sideBNames : sideANames
+        const wager = b.wagerPerPerson
+        return (
+          <div className="flex flex-col gap-2">
+            <p className="text-base font-semibold text-blue-400">{winnerNames} won {margin}</p>
+            <p className="text-sm text-muted">
+              {loserNames} paid <span className="text-brand font-medium">${wager.toFixed(2)}</span> / person
+            </p>
+          </div>
+        )
+      }
+
+      // Active — compute live match score
+      const { holeByHole, aWins, bWins, holesPlayed, matchStatus } = computeMatchScore(mp.sideA, mp.sideB, scores, useNet)
+      const aUp = aWins - bWins
+      const netColorA = aUp > 0 ? 'text-green-600' : aUp < 0 ? 'text-danger' : 'text-muted'
+      const netColorB = aUp < 0 ? 'text-green-600' : aUp > 0 ? 'text-danger' : 'text-muted'
+      const displayA = aUp > 0 ? `${aWins - bWins} UP` : aUp === 0 ? 'AS' : `${bWins - aWins} DOWN`
+      const displayB = aUp < 0 ? `${bWins - aWins} UP` : aUp === 0 ? 'AS' : `${aWins - bWins} DOWN`
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-brand">{sideANames}</span>
+            <span className={`text-sm font-bold ${netColorA}`}>{displayA}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-brand">{sideBNames}</span>
+            <span className={`text-sm font-bold ${netColorB}`}>{displayB}</span>
+          </div>
+          <p className="text-xs text-muted">{holesPlayed}/18 holes played · {matchStatus}</p>
+          {holeByHole.length === 0 && <p className="text-xs text-muted italic">No holes played yet</p>}
         </div>
       )
     }
@@ -489,8 +651,8 @@ export function SideBetDetailPage() {
         )}
       </div>
 
-      {/* Scores */}
-      {(b.status === 'active' || b.status === 'settled') && (
+      {/* Scores — not shown for Hammer, Skins, or Match (hole results card covers it) */}
+      {!isHammer && !isSkins && !isMatch && (b.status === 'active' || b.status === 'settled') && (
         <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-3">
           <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Scores</h2>
           <div className="flex flex-col">
@@ -536,10 +698,148 @@ export function SideBetDetailPage() {
         </div>
       )}
 
+      {/* Hammer hole-by-hole breakdown */}
+      {isHammer && b.hammerConfig && b.hammerConfig.holeResults.length > 0 && (
+        <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+          <div className="bg-blue-600 px-4 py-2.5 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-white">🔨 Hole Results</h2>
+            <span className="text-xs text-white/70">{b.hammerConfig.holeResults.length}/18 holes</span>
+          </div>
+          <div className="divide-y divide-card-border">
+            {Object.values(Object.fromEntries(b.hammerConfig.holeResults.map((r) => [r.hole, r])))
+              .sort((a, z) => a.hole - z.hole)
+              .map((r) => {
+                const cfg = b.hammerConfig!
+                const uid = currentUser!.uid
+                const myHammerSide: 'A' | 'B' | null = cfg.sideA.includes(uid) ? 'A' : cfg.sideB.includes(uid) ? 'B' : null
+                const sideANames = cfg.sideA.map(getName).join(' & ')
+                const sideBNames = cfg.sideB.map(getName).join(' & ')
+                const isFold = r.foldedBy !== null
+                const winner = isFold
+                  ? (r.foldedBy === 'A' ? sideBNames : sideANames)
+                  : r.winningSide === 'A' ? sideANames
+                  : r.winningSide === 'B' ? sideBNames
+                  : null
+                const resultLabel = isFold
+                  ? `${r.foldedBy === 'A' ? sideANames : sideBNames} conceded`
+                  : r.winningSide === 'tie' ? 'Tied'
+                  : `${winner} won`
+
+                // Determine winning side from viewer's perspective
+                const winningSide = isFold
+                  ? (r.foldedBy === 'A' ? 'B' : 'A')
+                  : r.winningSide === 'tie' ? 'tie'
+                  : r.winningSide
+                const iWon = myHammerSide !== null && winningSide === myHammerSide
+                const iLost = myHammerSide !== null && winningSide !== 'tie' && winningSide !== null && winningSide !== myHammerSide
+                const resultColor = winningSide === 'tie' ? 'text-muted' : iWon ? 'text-green-600' : iLost ? 'text-danger' : 'text-muted'
+                const amountColor = winningSide === 'tie' ? 'text-muted' : iWon ? 'text-green-600' : iLost ? 'text-danger' : 'text-brand'
+
+                return (
+                  <div key={r.hole} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                    <span className="text-xs font-bold text-brand w-12 shrink-0">Hole {r.hole}</span>
+                    <span className={`text-xs font-medium flex-1 ${resultColor}`}>
+                      {resultLabel}
+                      {r.hammersThrown > 0 && (
+                        <span className="text-blue-600 ml-1">{'🔨'.repeat(Math.min(r.hammersThrown, 3))}</span>
+                      )}
+                    </span>
+                    <span className={`text-xs font-bold shrink-0 ${amountColor}`}>${r.stake.toFixed(2)}</span>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Skins hole-by-hole breakdown */}
+      {isSkins && b.skinsResult && b.skinsResult.holeResults.length > 0 && (
+        <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+          <div className="bg-blue-600 px-4 py-2.5 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-white">⛳ Hole Results</h2>
+            <span className="text-xs text-white/70">{b.skinsResult.holeResults.length}/18 holes</span>
+          </div>
+          <div className="divide-y divide-card-border">
+            {b.skinsResult.holeResults
+              .slice()
+              .sort((a, z) => a.hole - z.hole)
+              .map((r) => {
+                const isWinner = r.winnerId === currentUser!.uid
+                const isLoser = !isWinner && r.winnerId !== null
+                const resultLabel = r.winnerId === null
+                  ? 'Wash'
+                  : `${getName(r.winnerId)} won`
+                const resultColor = r.winnerId === null ? 'text-muted'
+                  : isWinner ? 'text-green-600'
+                  : isLoser ? 'text-danger'
+                  : 'text-brand'
+                const amountColor = r.winnerId === null ? 'text-muted'
+                  : isWinner ? 'text-green-600'
+                  : isLoser ? 'text-danger'
+                  : 'text-brand'
+                return (
+                  <div key={r.hole} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                    <span className="text-xs font-bold text-brand w-12 shrink-0">Hole {r.hole}</span>
+                    <span className={`text-xs font-medium flex-1 ${resultColor}`}>{resultLabel}</span>
+                    {r.score != null && (
+                      <span className="text-xs text-muted shrink-0">{r.score}</span>
+                    )}
+                    <span className={`text-xs font-bold shrink-0 ${amountColor}`}>
+                      {r.winnerId === null ? '—' : `$${b.skinsResult!.payoutPerSkin.toFixed(2)}`}
+                    </span>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Match Play hole-by-hole breakdown — computed live from scores */}
+      {isMatch && b.matchPlayers && (() => {
+        const mp = b.matchPlayers!
+        const { holeByHole } = computeMatchScore(mp.sideA, mp.sideB, scores, useNet)
+        if (holeByHole.length === 0) return null
+        const myHammerSide: 'A' | 'B' | null = mp.sideA.includes(uid) ? 'A' : mp.sideB.includes(uid) ? 'B' : null
+        const sideANames = mp.sideA.map(getName).join(' & ')
+        const sideBNames = mp.sideB.map(getName).join(' & ')
+        return (
+          <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+            <div className="bg-blue-600 px-4 py-2.5 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">🏌️ Hole Results</h2>
+              <span className="text-xs text-white/70">{holeByHole.length}/18 holes</span>
+            </div>
+            <div className="divide-y divide-card-border">
+              {holeByHole.map((r) => {
+                const iWon = myHammerSide !== null && r.winner === myHammerSide
+                const iLost = myHammerSide !== null && r.winner !== 'tie' && r.winner !== myHammerSide
+                const resultLabel = r.winner === 'tie' ? 'Halved'
+                  : r.winner === 'A' ? `${sideANames} won`
+                  : `${sideBNames} won`
+                const resultColor = r.winner === 'tie' ? 'text-muted'
+                  : iWon ? 'text-green-600'
+                  : iLost ? 'text-danger'
+                  : 'text-brand'
+                return (
+                  <div key={r.hole} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                    <span className="text-xs font-bold text-brand w-12 shrink-0">Hole {r.hole}</span>
+                    <span className={`text-xs font-medium flex-1 ${resultColor}`}>{resultLabel}</span>
+                    <span className="text-xs text-muted shrink-0">{r.aScore} – {r.bScore}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Standing */}
-      <div className="bg-card-bg border border-card-border rounded-xl p-4 flex flex-col gap-2">
-        <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">Bet Status</h2>
-        {standingBlock()}
+      <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+        <div className="bg-blue-600 px-4 py-2.5">
+          <h2 className="text-sm font-bold text-white">Bet Status</h2>
+        </div>
+        <div className="p-4 flex flex-col gap-2">
+          {standingBlock()}
+        </div>
       </div>
 
       {/* Pending join requests — visible to participants */}

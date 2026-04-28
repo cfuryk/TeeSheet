@@ -9,6 +9,7 @@ interface Props {
   onSelect: (score: number) => void
   strokes?: number
   navigation: React.ReactNode
+  hammerBar?: React.ReactNode
   golferName?: string
   courseHandicap?: number
   vsPar?: number | null
@@ -17,7 +18,7 @@ interface Props {
   isLocked?: boolean
 }
 
-export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName, courseHandicap, vsPar, holesPlayed, totalGross, isLocked }: Props) {
+export function HoleInfo({ hole, currentScore, onSelect, navigation, hammerBar, golferName, courseHandicap, vsPar, holesPlayed, totalGross, isLocked }: Props) {
   const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -167,6 +168,12 @@ export function HoleInfo({ hole, currentScore, onSelect, navigation, golferName,
       </div>
 
       <div className="border-t border-card-border mt-3 pt-2">
+        {hammerBar && (
+          <>
+            {hammerBar}
+            <div className="border-t border-card-border mt-2 mb-2" />
+          </>
+        )}
         {navigation}
       </div>
       </div>

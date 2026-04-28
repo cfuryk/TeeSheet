@@ -68,8 +68,8 @@ export const groupService = {
       updatedAt: serverTimestamp(),
     })
     await batch.commit()
-    // Track on user profile for My Rounds queries
-    await userService.addParticipantRoundId(golferId, roundId)
+    // Track on user profile for My Rounds queries — best-effort, may fail if caller isn't the invitee
+    userService.addParticipantRoundId(golferId, roundId).catch(() => { /* non-critical */ })
   },
 
   async getGroup(roundId: string, groupId: string): Promise<Group | null> {
